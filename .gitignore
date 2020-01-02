@@ -1,3 +1,6 @@
 .*
+~$*
 !/.gitignore
 !/.gitattributes
+analyze/output/figures/*
+*.pdf
