@@ -4,3 +4,4 @@
 !/.gitattributes
 analyze/output/figures/*
 *.pdf
+.DS_Store
