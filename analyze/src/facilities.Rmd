@@ -1,5 +1,0 @@
-setwd("C:/Users/marqu/git/ice-facilities")
-
-data <- read.csv('analyze/input/2019-ICFO-31121.csv.gz')
-
-# no rain today
