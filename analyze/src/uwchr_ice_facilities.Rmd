@@ -10,34 +10,19 @@ output:
 ---
 
 # Introduction
-Interior immigration enforcement is receiving increased attention from researchers in collaboration with activists and advocacy groups. The University of Washington Center for Human Rights answers the following research questions in partnership with local social movements. The research questions in this project describe and explain the following associations:
+Interior immigration enforcement is receiving increased attention from researchers in collaboration with activists and advocacy groups. The University of Washington Center for Human Rights answers the following research questions in partnership with such local social movements. The research questions in this project describe and explain the following associations:
 
-* 1. What is the influence of detention center capacity on immigration law enforcement practices? 
-** a. What is the influence of average daily population (ADP) on:
-***  i. encounters
-***  ii. arrests
-*** iii. removals
-  
+* 1. What is the influence of detention center capacity on immigration law enforcement practices?
 * 2. What is the influence of detention center capacity on immigration bail bonds?
-**a. What is the influence of detention center capacity on:
-***  i. money deposit
-***  ii. cash bail
 
-* The number of moves to opportunity neighborhoods made by families, particularly those with younger children, and;
 
-* how long families stay in those neighborhoods.
-
-This .Rmd file performs data wrangling tasks and exploratory analyses of administrative records on detention facilities spanning the years 2016--2019 obtained from Department of Homeland Security (DHS) Immigration and Customs Enforcement (ICE) via Freedom of Information Act (FOIA) requests submitted by the University of Washington Center for Human Rights.
-
-U.S. Immigration and Customs Enforcement
-
-I tidy these data to then facilitate their transformation and visualization. I describe univariate statistics and covariation between variables I observe for the purpose of modelling associations among immigration detention facilities, interior immigration law enforcement practices, and immigration bail bonds.
-
+This .Rmd file performs data wrangling tasks and exploratory analyses of administrative records on detention facilities spanning the years 2016--2019. Data were obtained from the United States Department of Homeland Security (DHS) federal law enforcement agency, US Immigration and Customs Enforcement (ICE) via Freedom of Information Act (FOIA) requests submitted by the University of Washington Center for Human Rights.
+ 
 # Data wrangling
 I first clear the working memory, load user-created packages, and import data with the `R` programming language and software environment for statistical computing and graphics. I tidy these data to then facilitate their transformation and visualization. 
 
-## Import data and data management
-```{r install_load_packages, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+## Initiate environment
+```{r install_packages, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
 # clear memory
 rm(list=ls())
 
@@ -57,13 +42,12 @@ library(stringr)
 library(lavaan)
 library(forcats)
 library(lubridate)
-library(eeptools)
-library(naniar)
-library(VIM)
-library(reshape2)
-library(ggalt)
+library(modelr)
 ```
 
+Next, I will read three different data frames into `R`. The first data frame contains facility-level information on average daily population, X, Y, and Z. The second data frame contains individual-level arrest records. These data come from the U.S. Immigration and Customs Enforcement (ICE) agency responsible for interior immigration enforcement, and is  documented in SOURCE. Derived from the US Census Bureau American Community Survey (ACS), the third data frame comprises information on economic, social, and demographic characteristics of counties. 
+
+## Import data
 ```{r read_data, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
 # check working directory
 getwd() # "C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academic/Graduate School/University of Washington/Research/Projects/ICE"
@@ -71,65 +55,20 @@ getwd() # "C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academic/G
 # set working directory
 setwd("C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academic/Graduate School/University of Washington/Research/Projects/ICE")
 
-# load rectangular data
+# load foia-ice rectangular data
   # read facilities data
-  df <- ice_facilities_data <- read_delim(
-    "C:/Users/marqu/git/ice-facilities/analyze/input/2019-ICFO-31121.csv.gz", 
-                         delim = "|", 
-                         skip = 6) # skip rows of metadata
-  
+  df_facilities <- ice_facilities_data <- read_delim(
+    "C:/Users/marqu/git/ice-facilities/analyze/input/facil-list.csv.gz", 
+    delim = "|") 
+                    
   # read arrests data
-  df.arrests <- ice_arrests_data <- read_csv(
-    "C:/Users/marqu/git/ice-ero-lesa/us/import/input/EROArrests_LESA_STU_Final-REDACTED.csv", 
-                       #  delim = "|", 
-                         skip = 5) # skip rows of metadata
-
-  #clean/output/facil-list.csv.gz 
-    # check against other dataset
-  
-
-# view data frame
-df
-#View(df)
-
-# rename columns
-df <- df %>% 
-  rename(Facility_Name = Name, 
-         Facility_Street = Address, 
-         Facility_City = City,
-         Facility_State = State, 
-         Facility_Zip = Zip,
-         Facility_AOR = AOR, 
-         Facility_Type = Type, 
-         Authorization_Status = "Authorization Status", 
-         Authorizing_Authority = "Authorizing Authority",
-         FY19_ADP = "FY19 ADP", 
-         FY18_ADP = "FY18 ADP", 
-         FY17_ADP = "FY17 ADP", 
-         FY16_ADP = "FY16 ADP", 
-         FY15_ADP = "FY15 ADP", 
-         FY14_ADP = "FY14 ADP", 
-         FY13_ADP = "FY13 ADP", 
-         FY12_ADP = "FY12 ADP", 
-         FY11_ADP = "FY11 ADP", 
-         FY19_ADP_Male_Crim = "Male Crim", 
-         FY19_ADP_Male_NonCrim = "Male Non-Crim", 
-         FY19_ADP_Female_Crim= "Female Crim", 
-         FY19_ADP_Female_NonCrim = "Female Non-Crim", 
-         FY19_InitialBookins = "FY19 Initial Bookins", 
-         FY18_InitialBookins = "FY18 Initial Bookins", 
-         FY17_InitialBookins = "FY17 Initial Bookins", 
-         FY16_InitialBookins = "FY16 Initial Bookins", 
-         FY15_InitialBookins = "FY15 Initial Bookins", 
-         FY14_InitialBookins = "FY14 Initial Bookins", 
-         FY13_InitialBookins = "FY13 Initial Bookins", 
-         FY12_InitialBookins = "FY12 Initial Bookins", 
-         FY11_InitialBookins = "FY11 Initial Bookins")
-
-colnames(df)
-
+  df_arrests <- ice_arrests_data <- 
+      read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/arrests.csv.gz", 
+                 delim = "|")
+    
+    
 # load (tidy)census decennial and inter-decennial rectangular data
-#vt <- get_decennial(
+    #vt <- get_decennial(
 #  geography,
 #  year = 2010,
 #  geometry = 
@@ -140,826 +79,807 @@ colnames(df)
 #             state = "VT",
 # year =
 ```
-This data frame contains all 214 detention facilities contracted to intern immigrant prisoners in the United States (US) from 2016--2019. The data come from Immigration and Customs Enforcement (ICE) within the Department of Homeland Security, and is  documented in SOURCE.
 
 ```{r structure, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
 # check number of rows and columns
-nrow(df)
-ncol(df)
+nrow(df_facilities)
+ncol(df_facilities)
 
 # check structure of data
-str(df) # no factor variables
-glimpse(df)
+str(df_facilities) # no factor variables
+glimpse(df_facilities)
 
 # check beginning and end of data
-head(df[, c(6:7, 10)])
-tail(df[, c(6:7, 10)])
+head(df_facilities[, c(6:7, 10)])
+tail(df_facilities[, c(6:7, 10)])
 
 # check variable names
-names(df)
+names(df_facilities)
 
 # standardize variable names
-#names(df) <- tolower(names(df))
-#names(df)
+#names(df_facilities) <- tolower(names(df_facilities))
+#names(df_facilities)
 
 ```
 
-## Tidy data and data transformation
+## Data transformation
 I will solve the vast majority of my data manipulation challenges in this section. Here, I will recode my variables of interest. It is important to note that I will be replacing the unusual values (i.e, not in universe, unknown) with missing values (i.e., NA in R).
 
 ### Select variables
 #### Detention location
-Detention facilities are uniquely identified by a code (`DETLOC`). Other geographic variables include facility name, street address, city, state, and ZIP code. Facilities are also located within an area of responsibility (AOR).
+Detention facilities are uniquely identified by a code (`detloc`). Other geographic variables include facility name, street address, city, county, state, and ZIP code. Facilities are also located within an area of responsibility (AOR).
 
-```{r DETLOC, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# DETLOC
+```{r detloc, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# detloc
 # check levels
-class(df$DETLOC)
+class(df_facilities$detloc)
 
-df %>%
-  count(DETLOC)
+df_facilities %>%
+  count(detloc)
 
 # verify unique IDs
-df %>%
-  count(DETLOC) %>%
-  filter(n > 1) # rows are unique
+df_facilities %>%
+  count(detloc) %>%
+  filter(n > 1) # rows are unique except for "redacted" obs (n = 207)
+                # redacted obs are type == "ORR"
+
+df_facilities %>%
+  summarise(count = n_distinct(detloc)) # 1479 unique obs
+
+df_facilities %>% 
+  filter(detloc != "Redacted") %>% # filter out redacted obs
+  summarise(count = n_distinct(detloc)) # 1478 unique obs
 
 # convert to factor
-df <- df %>%
-  mutate(DETLOC = as.factor(DETLOC))
+df_facilities <- df_facilities %>%
+  mutate(detloc = as.factor(detloc))
 ```
 
 #### Facility name
-```{r Facility_Name, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Facility_Name
+```{r name, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# name
 # check levels
-class(df$Facility_Name)
-class(df$`Facility_Name`)
-class(df$"Facility_Name")
+class(df_facilities$name)
+class(df_facilities$`name`)
+class(df_facilities$"name")
 
-df %>%
-  count(Facility_Name)
-df %>%
-  count(`Facility_Name`)
-df %>%
-  count("Facility_Name")
+df_facilities %>%
+  count(name)
+df_facilities %>%
+  count(`name`)
+df_facilities %>%
+  count("name")
 
 # verify unique IDs
-df %>%
-  count(Facility_Name) %>%
-  filter(n > 1)
-    #BUTLER COUNTY JAIL	2			
-    #ORANGE COUNTY JAIL	2	
+df_facilities %>%
+  count(name) %>%
+  filter(n > 1) # facility names are not unique
 
-df %>%
-  summarise(count = n_distinct(Facility_Name)) # 212 unique facility names
+df_facilities %>%
+  summarise(count = n_distinct(name)) # 1407 unique facility names
 ```
 
 #### Facility street address
-```{r Facility_Street, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Facility_Street
+```{r address, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# address
 # check levels
-class(df$Facility_Street)
-class(df$`Facility_Street`)
-class(df$"Facility_Street")
+class(df_facilities$address)
+class(df_facilities$`address`)
+class(df_facilities$"address")
 
-df %>%
-  count(Facility_Street)
-df %>%
-  count(`Facility_Street`)
-df %>%
-  count("Facility_Street")
+df_facilities %>%
+  count(address)
+df_facilities %>%
+  count(`address`)
+df_facilities %>%
+  count("address")
 
 # verify unique IDs
-df %>%
-  count(Facility_Street) %>%
+df_facilities %>%
+  count(address) %>%
   filter(n > 1)
 
-    #600 EAST FOURTH ST.	2			
-    #FM 1144 AT US HIGHWAY 181	2
-
-df %>%
-  summarize(count = n_distinct(Facility_Street)) # 212 unique facility streets
+df_facilities %>%
+  summarize(count = n_distinct(address)) # 1416 facility addresses
 ```
 
 #### Facility state
-```{r Facility_State, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Facility_State
+```{r state, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# state
 # check levels
-class(df$Facility_State)
-class(df$`Facility_State`)
-class(df$"Facility_State")
+class(df_facilities$state)
+class(df_facilities$`state`)
+class(df_facilities$"state")
 
-df %>%
-  count(Facility_State) # 47 rows
-df %>%
-  count(`Facility_State`) # 47 rows
-df %>%
-  count("Facility_State") # 214 rows
-table(df$Facility_State)
+df_facilities %>%
+  count(state) # 56 rows
+df_facilities %>%
+  count(`state`) # 56 rows
+df_facilities %>%
+  count("state") # 1685 rows
+table(df_facilities$state)
 
 # plot levels
-ggplot(df, aes(Facility_State)) + 
+ggplot(df_facilities, aes(state)) + 
   geom_bar()  +
-  theme(axis.text.x = element_text(angle = 90, size = 10))
+  theme(axis.text.x = element_text(angle = 90, size = 8))
+
+# view states with a bar chart
+df_facilities %>%
+  mutate(state = state %>% fct_infreq() %>% fct_rev()) %>%
+  ggplot(aes(state)) +
+    geom_bar() +
+    theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 
 # convert to factor
-df <- df %>%
-  mutate(Facility_State = as.factor(Facility_State))
+df_facilities <- df_facilities %>%
+  mutate(state = as.factor(state))
 
 # check proportions
-table(df$Facility_State)
-tab1 <- table(df$Facility_State)
+table(df_facilities$state)
+tab1 <- table(df_facilities$state)
 prop.table(tab1)
-df %>%
-  count(Facility_State)
+df_facilities %>%
+  count(state)
 ```
 
 #### Facility city
-```{r Facility_City, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Facility_City
+```{r city, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# city
 # check levels
-class(df$Facility_City)
-class(df$`Facility_City`)
-class(df$"Facility_City")
+class(df_facilities$city)
+class(df_facilities$`city`)
+class(df_facilities$"city")
 
-df %>%
-  count(Facility_City)
-df %>%
-  count(`Facility_City`)
-df %>%
-  count("Facility_City") # 198 rows
+df_facilities %>%
+  count(city)
+df_facilities %>%
+  count(`city`)
+df_facilities %>%
+  count("city")
 
 # verify unique obs
-df %>%
-  count(Facility_City) %>%
-  filter(n > 1) # 16 duplicates
+df_facilities %>%
+  count(city) %>%
+  filter(n > 1) # many duplicates
 
-df %>%
-  summarize(count = n_distinct(Facility_City)) # 198 unique cities
+df_facilities %>%
+  summarize(count = n_distinct(city))
 
 # concatenate facility city and state columns
-df <- df %>% 
-  unite("Facility_City", Facility_City:Facility_State, sep = ", ", remove = FALSE, na.rm = FALSE) %>%
-  mutate(Facility_City = as.factor(Facility_City))
+df_facilities <- df_facilities %>% 
+  unite("city", c(city,state), sep = ", ", remove = FALSE, na.rm = FALSE) %>%
+  mutate(city = as.factor(city))
 
-# plot levels
-ggplot(df, aes(Facility_City)) + 
-  geom_bar() + 
-  theme(axis.text.x = element_text(angle = 90, size = 10))
+# plot levels with a bar chart
+df_facilities %>%
+  mutate(city = city %>% fct_infreq() %>% fct_rev()) %>%
+  ggplot(aes(city)) +
+    geom_bar() +
+    theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 ```
 
 #### Facility ZIP code
-```{r Facility_Zip, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Facility_Zip
+```{r zip, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# zip
 # check levels
-class(df$Facility_Zip)
-class(df$`Facility_Zip`)
-class(df$"Facility_Zip")
+class(df_facilities$zip)
+class(df_facilities$`zip`)
+class(df_facilities$"zip")
 
-df %>%
-  count(Facility_Zip) # 200 rows
-df %>%
-  count(`Facility_Zip`) # 200 rows
-df %>%
-  count("Facility_Zip") # 214 rows
+df_facilities %>%
+  count(zip) # 1257 rows
+df_facilities %>%
+  count(`zip`) # 1257 rows
+df_facilities %>%
+  count("zip") # 1685 rows
 
 # verify unique obs
-df %>%
-  count(Facility_Zip) %>%
-  filter(n > 1) # 13 rows
+df_facilities %>%
+  count(zip) %>%
+  filter(n > 1) # obs not unique
 
-# plot levels
-ggplot(df, aes(Facility_Zip)) + 
-  geom_bar()
+# plot levels with a bar chart
+df_facilities %>%
+  mutate(zip = zip %>% fct_infreq() %>% fct_rev()) %>%
+  ggplot(aes(zip)) +
+    geom_bar() +
+    theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 
 # check proportions
-table(df$Facility_Zip)
-tab1 <- table(df$Facility_Zip)
+table(df_facilities$zip)
+tab1 <- table(df_facilities$zip)
 prop.table(tab1)
-df %>%
-  count(Facility_Zip)
+df_facilities %>%
+  count(zip)
 ```
 
 #### Facility area of responsibility (AOR)
-```{r Facility_AOR, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Facility_AOR
+```{r aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# aor
 # check levels
-class(df$Facility_AOR)
-class(df$`Facility_AOR`)
-class(df$"Facility_AOR")
+class(df_facilities$aor)
+class(df_facilities$`aor`)
+class(df_facilities$"aor")
 
-df %>%
-  count(Facility_AOR) # 24 rows
-df %>%
-  count(`Facility_AOR`) # 24 rows
-df %>%
-  count("Facility_AOR") # 214 rows
-table(df$Facility_AOR)
+df_facilities %>%
+  count(aor) # 24 rows
+df_facilities %>%
+  count(`aor`) # 24 rows
+df_facilities %>%
+  count("aor") # 1685 rows
+table(df_facilities$aor)
 
-# plot levels
-ggplot(df, aes(Facility_AOR)) + 
-  geom_bar()  +
-  theme(axis.text.x = element_text(angle = 90, size = 10))
+# plot number of facilities within AORs
+df_facilities %>%
+  mutate(aor = aor %>% fct_infreq() %>% fct_rev()) %>%
+  ggplot(aes(aor)) +
+    geom_bar() +
+    theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 
 # convert to factor
-df <- df %>%
-  mutate(Facility_AOR = as.factor(Facility_AOR))
+df_facilities <- df_facilities %>%
+  mutate(aor = as.factor(aor))
 
 # check proportions
-table(df$Facility_AOR)
-tab1 <- table(df$Facility_AOR)
+table(df_facilities$aor)
+tab1 <- table(df_facilities$aor)
 prop.table(tab1)
-df %>%
-  count(Facility_AOR)
+df_facilities %>%
+  count(aor)
 ```
 
 #### Facility type
-```{r Facility_Type, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Facility_Type                   
+```{r type, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# type                   
 # check levels
-class(df$Facility_Type)
-class(df$`Facility_Type`)
-class(df$"Facility_Type")
+class(df_facilities$type)
+class(df_facilities$`type`)
+class(df_facilities$"type")
 
-df %>%
-  count(Facility_Type) # 4 rows
-df %>%
-  count(`Facility_Type`) # 4 rows
-df %>%
-  count("Facility_Type") # 214 rows
+df_facilities %>%
+  count(type) # 8 rows
+df_facilities %>%
+  count(`type`) # 8 rows
+df_facilities %>%
+  count("type") # 1685 rows
+table(df_facilities$type)
 
-#1 CDF              13 Contract Detention Facility (CDF). A detention facility owned and operated by a private company in the business of providing detention services under a government contract. Like the SPCs the CDFs are one of several types of facilities used by ICE to house detained individuals.
-
-#2 IGSA            112 Intergovernmental Service Agreement (IGSA) Facility. IGSAs are agreements between the federal government and a state or local government to provide detention beds in jails, prisons, and other local or state government detention facilities. While government owned, these facilities may be operated by either local or state agencies or by a private company in the business of providing detention services. Some of these facilities may even be dedicated for federal use.
-
-#3 SPC               5 ICE Service Processing Center (SPC). An ICE owned detention facility used to house individuals who have been detained by ICE because of questions about their immigration status. SPCs were formerly owned and operated by ICE. Now, however, SPCs are owned by ICE but operated by private sector companies. The SPCs are among several different types of facilities commonly used by ICE to house detainees.
-
-#4 USMS IGA         84 U.S. Marshals Service Office [USM]. Holding area in a U.S. Marshals Service office.
-
-
-
-# plot levels
-ggplot(df, aes(Facility_Type)) + 
-  geom_bar() +
-  theme(axis.text.x = element_text(angle = 90, size = 10))
+# plot levels with a bar chart
+df_facilities %>%
+  mutate(type = type %>% fct_infreq() %>% fct_rev()) %>%
+  ggplot(aes(type)) +
+    geom_bar() +
+    theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 
 # convert to factor
-df <- df %>%
-  mutate(Facility_Type = as.factor(Facility_Type))
+df_facilities <- df_facilities %>%
+  mutate(type = as.factor(type))
 
 # check proportions
-table(df$Facility_Type)
-tab1 <- table(df$Facility_Type)
+table(df_facilities$type)
+tab1 <- table(df_facilities$type)
 prop.table(tab1)
-df %>%
-  count(Facility_Type)
+df_facilities %>%
+  count(type)
 ```
 
-#### Authorization status
-```{r Authorization_Status, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Authorization_Status                   
-# check levels
-class(df$Authorization_Status)
-class(df$`Authorization_Status`)
-class(df$"Authorization_Status")
+#### Average daily population (ADP)
+I will calculate summary statistics for the average daily population (ADP). I also plot their distributions.
 
-df %>%
-  count(Authorization_Status) # 214 rows
-df %>%
-  count(`Authorization_Status`) # 214 rows
-df %>%
-  count("Authorization_Status") # 214 rows
+```{r adp, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# fy18_adp
+summarize(df_facilities, `Fiscal Year` = "2018", `Average Daily Popluation` = mean(fy18_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy18_adp))
+  
+summarize(df_facilities, `Fiscal Year` = "2018", `Average Daily Popluation` = sum(fy18_adp)) %>% pander()
+  
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy18_adp))
+  
+# fy17_adp
+summarize(df_facilities, `Fiscal Year` = "2017", `Average Daily Popluation` = mean(fy17_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy17_adp))
+  summarize(df_facilities, `Fiscal Year` = "2017", `Average Daily Popluation` = sum(fy17_adp)) %>% pander()
+
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy17_adp))
+  
+# fy16_adp
+summarize(df_facilities, `Fiscal Year` = "2016", `Average Daily Popluation` = mean(fy16_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy16_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2016", `Average Daily Popluation` = sum(fy16_adp)) %>% pander()
+
+  
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy16_adp))
+  
+# fy15_adp
+summarize(df_facilities, `Fiscal Year` = "2015", `Average Daily Popluation` = mean(fy15_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy15_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2015", `Average Daily Popluation` = sum(fy15_adp)) %>% pander()
+
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy15_adp))
+  
+# fy14_adp
+summarize(df_facilities, `Fiscal Year` = "2014", `Average Daily Popluation` = mean(fy14_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy14_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2014", `Average Daily Popluation` = sum(fy14_adp)) %>% pander()
+
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy14_adp))
+  
+# fy13_adp
+summarize(df_facilities, `Fiscal Year` = "2013", `Average Daily Popluation` = mean(fy13_adp))%>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy13_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2013", `Average Daily Popluation` = sum(fy13_adp))%>% pander()
+  
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy13_adp))
+
+# fy12_adp
+summarize(df_facilities, `Fiscal Year` = "2012", `Average Daily Popluation` = mean(fy12_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy12_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2012", `Average Daily Popluation` = sum(fy12_adp)) %>% pander()
+
+  
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy12_adp))
+  
+# fy11_adp
+summarize(df_facilities, `Fiscal Year` = "2011", `Average Daily Popluation` = mean(fy11_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy11_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2011", `Average Daily Popluation` = sum(fy11_adp)) %>% pander()
+
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy11_adp))
+  
+# fy10_adp
+summarize(df_facilities, `Fiscal Year` = "2010", `Average Daily Popluation` = mean(fy10_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy10_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2010", `Average Daily Popluation` = sum(fy10_adp)) %>% pander()
+
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy10_adp))
+  
+# fy09_adp
+summarize(df_facilities, `Fiscal Year` = "2009", `Average Daily Popluation` = mean(fy09_adp)) %>% pander()
+  # calculate summary statistics
+  summary(select(df_facilities, fy09_adp))
+  
+  summarize(df_facilities, `Fiscal Year` = "2009", `Average Daily Popluation` = sum(fy09_adp)) %>% pander()
+  
+  # plot levels
+  ggplot(df_facilities) + 
+    geom_histogram(mapping = aes(x = fy09_adp))
 ```
 
-#### Authorizing authority
-```{r Authorizing_Authority, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# Authorizing_Authority                   
-# check levels
-class(df$Authorizing_Authority)
-class(df$`Authorizing_Authority`)
-class(df$"Authorizing_Authority")
+The average daily population for each detention facility is available for `r df_facilities %>% summarise(count = n_distinct(adp))`, respectively.
 
-df %>%
-  count(Authorizing_Authority) # 2 rows
-df %>%
-  count(`Authorizing_Authority`) # 2 rows
-df %>%
-  count("Authorizing_Authority") # 214 obs
+The probability distributions of the average daily population for the facilities in every year is skewed right. That is, in every year, there are many more facilities that hold very few detainees than there are few facilities that hold many detainees. However, the majority of detention facilities hold zero prisoners in a fiscal year. As a result, the "average" average daily population is XXX.
 
-# plot levels
-ggplot(df, aes(Authorizing_Authority)) + 
-  geom_bar() +
-  theme(axis.text.x = element_text(size = 10))
+### Collapse data frame to a single row by group
+There are three steps to prepare these data. First, I group facilities by area of responsibility (AOR). Second, I summarize across AORs to compute average daily population, number of facilities, and proportion of facility types. 
 
-# convert to factor
-df <- df %>%
-  mutate(Authorizing_Authority = as.factor(Authorizing_Authority))
+```{r df_aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 
-# check proportions
-table(df$Authorizing_Authority)
-tab1 <- table(df$Authorizing_Authority)
-prop.table(tab1)
-df %>%
-  count(Authorizing_Authority)
-```
+#%>% 
+#   select(aor, detloc, city, zip, everything()) %>%
+#   arrange(aor, detloc, city, zip)
 
-### Average daily population (ADP)
-The average daily population for each detention facility is available for nine consecutive years, 2011--2019. Below, I calculate summary statistics and plot distributions for these variables.
- 
-```{r Average_Daily_Population, echo=FALSE, results='hide', warning=FALSE, message =FALSE, include=FALSE}
-# FY19_ADP
-summarize(df, `Fiscal Year` = "2019", 
-          `Average Daily Popluation` = mean(FY19_ADP)) %>%
-  pander()
-  # calculate summary statistics
-  summary(select(df, FY19_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY19_ADP))
-  
-# FY18_ADP
-summarize(df, `Fiscal Year` = "2018", `Average Daily Popluation` = mean(FY18_ADP)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY18_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY18_ADP))
-  
-# FY17_ADP
-summarize(df, `Fiscal Year` = "2017", `Average Daily Popluation` = mean(FY17_ADP)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY17_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY17_ADP))
-  
-# FY16_ADP
-summarize(df, `Fiscal Year` = "2016", `Average Daily Popluation` = mean(FY16_ADP)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY16_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY16_ADP))
-  
-# FY15_ADP
-summarize(df, `Fiscal Year` = "2015", `Average Daily Popluation` = mean(FY15_ADP)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY15_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY15_ADP))
-  
-# FY14_ADP
-summarize(df, `Fiscal Year` = "2014", `Average Daily Popluation` = mean(FY14_ADP)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY14_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY14_ADP))
-  
-# FY13_ADP
-summarize(df, `Fiscal Year` = "2013", `Average Daily Popluation` = mean(FY13_ADP))%>% pander()
-  # calculate summary statistics
-  summary(select(df, FY13_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY13_ADP))
-  
-  # FY12_ADP
-summarize(df, `Fiscal Year` = "2012", `Average Daily Popluation` = mean(FY12_ADP)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY12_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY12_ADP))
-  
-  # FY11_ADP
-summarize(df, `Fiscal Year` = "2011", `Average Daily Popluation` = mean(FY11_ADP)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY11_ADP))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY11_ADP))
-```
+  #df_facilities %>% count(n_distinct(aor))
+  # unique(df_facilities$aor)
+  # count number of AORs
+ # df_facilities %>% group_by(aor) %>% tally() %>% pander()
 
-Average daily population is also available by gender and offense, but only for fiscal year 2019.
-
-```{r Average_Daily_Population_Gender_Offense, echo=FALSE, results='hide', warning=FALSE, message =FALSE, include=FALSE}
-
-# FY19_ADP_Male_Crim
-summarize(df, `Fiscal Year` = "2019", 
-          `Average Daily Popluation (Male, Criminal)` = mean(FY19_ADP_Male_Crim)) %>%
-  pander()
-  # calculate summary statistics
-  summary(select(df, FY19_ADP_Male_Crim))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY19_ADP_Male_Crim))
-  
-# FY19_ADP_Male_NonCrim
-summarize(df, `Fiscal Year` = "2019", 
-          `Average Daily Popluation (Male, NonCriminal)` = mean(FY19_ADP_Male_NonCrim)) %>%
-  pander()
-  # calculate summary statistics
-  summary(select(df, FY19_ADP_Male_NonCrim))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY19_ADP_Male_NonCrim))  
-  # FY19_ADP_Female_Crim
-summarize(df, `Fiscal Year` = "2019", 
-          `Average Daily Popluation (Female, Criminal)` = mean(FY19_ADP_Female_Crim)) %>%
-  pander()
-  # calculate summary statistics
-  summary(select(df, FY19_ADP_Female_Crim))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY19_ADP_Female_Crim))
-  
-# FY19_ADP_Female_NonCrim
-summarize(df, `Fiscal Year` = "2019", 
-          `Average Daily Popluation (Female, NonCriminal)` = mean(FY19_ADP_Female_NonCrim)) %>%
-  pander()
-  # calculate summary statistics
-  summary(select(df, FY19_ADP_Female_NonCrim))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY19_ADP_Female_NonCrim))  
-```
-
-```{r Gender_Offense, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message =FALSE, include=FALSE}
-
-# Besides investigating sets of existing columns, it is useful to add new columns that are functions of existing columns.
-#### Gender
-# The population is divided into male and female immigrant detainees.
-
-# ```{r Average_Daily_Population_Gender, echo=FALSE, results='hide', warning=FALSE, message =FALSE, include=FALSE}
-
-# # FY19_ADP_Male and FY19_ADP_Female
-# df <- df %>%
+# # aggregate facilities to AOR
+# df_aor <- df_facilities %>%
+#   group_by(aor) %>% 
 #   mutate(
-#     FY19_ADP_Male = FY19_ADP_Male_Crim + FY19_ADP_Male_NonCrim,
-#     FY19_ADP_Female = FY19_ADP_Female_Crim + FY19_ADP_Female_NonCrim
-#   )
-# 
-# # FY19_ADP_Male
-# summarize(df, `Fiscal Year` = "2019", `Average Daily Population, Male` = mean(FY19_ADP_Male)) %>% pander()
-#   
-# # calculate summary statistics
-#   summary(select(df, FY19_ADP_Male))
-#   
-#   # plot levels
-#   ggplot(df) + 
-#     geom_histogram(mapping = aes(x = FY19_ADP_Male))
-# 
-# # FY19_ADP_Female
-# summarize(df, `Fiscal Year` = "2019", `Average Daily Population, Female` = mean(FY19_ADP_Female)) %>% pander()
-#   
-# # calculate summary statistics
-#   summary(select(df, FY19_ADP_Female))
-#   
-#   # plot levels
-#   ggplot(df) + 
-#     geom_histogram(mapping = aes(x = FY19_ADP_Female))
-#```
+#     n_detloc = n_distinct(detloc), # number of facilities
+#     n_city = n_distinct(city), # number of unique cities
+#     n_county = n_distinct(county), # number of unique counties
+#     n_state = n_distinct(state), # number of unique states 
+#     n_zip = n_distinct(zip)) %>% # number of unique zip codes
+#   group_by(aor, n_detloc, n_city, n_county, n_state, n_zip) %>%
+#   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+#   ungroup()
 
-#### Offense
-# The criminal status of an immigrant in detention is also indicated in the data frame.
-# 
-# ```{r Average_Daily_Population_Offense, echo=FALSE, results='hide', warning=FALSE, message =FALSE, include=FALSE}
 
-# # FY19_ADP_Crim and FY19_ADP_NonCrim
-# df <- df %>%
-#   mutate(
-#     FY19_ADP_Crim = FY19_ADP_Male_Crim + FY19_ADP_Female_Crim,
-#     FY19_ADP_NonCrim = FY19_ADP_Male_NonCrim  + FY19_ADP_Female_NonCrim
-#   )
-# 
-# # FY19_ADP_Crim
-# summarize(df, `Fiscal Year` = "2019", `Average Daily Population, Criminal Offense` = mean(FY19_ADP_Crim)) %>% pander()
-#   
-# # calculate summary statistics
-#   summary(select(df, FY19_ADP_Crim))
-#   
-#   # plot levels
-#   ggplot(df) + 
-#     geom_histogram(mapping = aes(x = FY19_ADP_Crim))
-# 
-# # FY19_ADP_NonCrim
-# summarize(df, `Fiscal Year` = "2019", `Average Daily Population, Non-criminal Offense` = mean(FY19_ADP_NonCrim)) %>% pander()
-#   
-# # calculate summary statistics
-#   summary(select(df, FY19_ADP_NonCrim))
-#   
-#   # plot levels
-#   ggplot(df) + 
-#     geom_histogram(mapping = aes(x = FY19_ADP_NonCrim))
+# aggregate facilities to AOR
+df_aor <- df_facilities %>%
+  group_by(aor) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  ungroup()
 ```
 
-The probability distributions of the average daily population for the facilities in every year and by subgroup is skewed right. That is, in every year, there are many more facilities that hold very few detainees than there are few facilities that hold many detainees.
-
-
-First, I will calculate summary statistics for these variables and plot their distributions.
-
-### Initial book-ins
-Initial book-ins are available for 2011--2019. These variables have similar distributions to the ADP variables above. A book-in is defined as XXXX. 
-
-```{r InitialBookins, echo=FALSE, results='hide', warning=FALSE, message =FALSE, include=FALSE}
-
-# FY19_InitialBookins
-summarize(df, `Fiscal Year` = "2019", `Initial Bookins` = mean(FY19_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY19_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY19_InitialBookins))
-  
-# FY18_InitialBookins
-summarize(df, `Fiscal Year` = "2018", `Initial Bookins` = mean(FY18_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY18_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY18_InitialBookins))
-  
-# FY17_InitialBookins
-summarize(df, `Fiscal Year` = "2017", `Initial Bookins` = mean(FY17_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY17_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY17_InitialBookins))
-  
-# FY16_InitialBookins
-summarize(df, `Fiscal Year` = "2016", `Initial Bookins` = mean(FY16_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY16_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY16_InitialBookins))
-  
-# FY15_InitialBookins
-summarize(df, `Fiscal Year` = "2015", `Initial Bookins` = mean(FY15_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY15_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY15_InitialBookins))
-  
-# FY14_InitialBookins
-summarize(df, `Fiscal Year` = "2014", `Initial Bookins` = mean(FY14_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY14_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY14_InitialBookins))
-  
-# FY13_InitialBookins
-summarize(df, `Fiscal Year` = "2013", `Initial Bookins` = mean(FY13_InitialBookins))%>% pander()
-  # calculate summary statistics
-  summary(select(df, FY13_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY13_InitialBookins))
-  
-  # FY12_InitialBookins
-summarize(df, `Fiscal Year` = "2012", `Initial Bookins` = mean(FY12_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY12_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY12_InitialBookins))
-  
-  # FY11_InitialBookins
-summarize(df, `Fiscal Year` = "2011", `Initial Bookins` = mean(FY11_InitialBookins)) %>% pander()
-  # calculate summary statistics
-  summary(select(df, FY11_InitialBookins))
-  
-  # plot levels
-  ggplot(df) + 
-    geom_histogram(mapping = aes(x = FY11_InitialBookins))
-```
-
-Now that I have the ICE facility-level data loaded into `R` and processed to be technically correct, I create an additional data frame that reshapes the data from long to wide.
-
+## Tidy data 
 ### Reshape data wide to long
-Longitudinal data are especially useful for understanding change over time within a household and individual. Such data are structured in long-format, requiring a particular set of statistical techniques to remove bias associated with interdependence of repeated measures.
 
-Data in long format differ from data in wide format with regard to their analytical requirements. At the conclusion of wranging these data, I will be able to provide both cross-sectional and longitudinal analyses of ICE detention facilities.
+Now that I have the ICE facility-level data loaded into `R` and processed to be technically correct, I create an additional data frame that reshapes the data from wide to long. I need to set up the data so they are in both wide and long formats for different parts of these analyses. In the wide format, the repeated responses for an observation (e.g., facility) will be in a single row, and each response is in a separate column. In the long format, each row is one time point per observation, so each facility will have data in multiple rows. There are at least three reasons for structuring data. First, software requirements. For example, the wide format is required for software to execute MANOVA and repeated measures procedures. Likewise, mixed models and many survival analysis procedures require data to be in the long format. Second, analytical implications. For instance, in the wide format, the unit of analysis is the facility whereas each measurement occasion for each facility is the unit of analysis in the long format. Third, the practical difference is that when the occasion is the unit of analysis (i.e., long), I can use each decade’s college education rate as a covariate for the same decade’s jobs value. In the wide format, when the unit of observation is the facility, there is no way to do this. I can use any of the college rates as covariates for all years, but I cannot have decade-specific covariates.
 
-```{r pivoting, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
-df.l <- df %>%
+The facility-level data frame is structured to be wide.
+
+Longitudinal data are especially useful for understanding change over time within an AOR, county, city, and facility. 
+
+Such data are structured in long-format, requiring a particular set of statistical techniques to remove bias associated with interdependence of repeated measures. 
+
+Data in long format differ from data in wide format with regard to their analytical requirements. 
+
+At the conclusion of wranging these data, I will be able to provide both cross-sectional and longitudinal analyses of ICE detention facilities.
+
+```{r pivoting_df_aor_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+df_aor_long <- df_aor %>% 
   pivot_longer(
-    cols = starts_with("FY"),
+    cols = starts_with("fy"),
     names_to = "key",
     values_to = "cases",
   ) %>%
   separate(key, 
-           c("Fiscal_Year", 
-             "Type", 
-             "Sex",
-             "Offense"), 
+           c("fiscal_year", 
+             "adp"), 
            sep = "_"
            ) %>% 
-  pivot_wider(names_from = c(Type, Sex, Offense), 
-              values_from = cases)
-
-# rename columns
-df.l <- df.l %>%
-  rename(ADP = ADP_NA_NA) %>%
-  rename(InitialBookins = InitialBookins_NA_NA)
+  pivot_wider(
+    names_from = c(adp), 
+    values_from = cases)
 
 # convert to factor
-df.l <- df.l %>%
-  mutate(Fiscal_Year = as.factor(Fiscal_Year))
-class(df.l) 
+df_aor_long <- df_aor_long %>%
+  mutate(fiscal_year = as.factor(fiscal_year))
+class(df_aor_long$fiscal_year) 
 
 # recode variable values
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY19'] <- '2019'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY18'] <- '2018'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY17'] <- '2017'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY16'] <- '2016'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY15'] <- '2015'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY14'] <- '2014'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY13'] <- '2013'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY12'] <- '2012'
-levels(df.l$Fiscal_Year)[levels(df.l$Fiscal_Year)=='FY11'] <- '2011'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy18'] <- '2018'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy17'] <- '2017'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy16'] <- '2016'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy15'] <- '2015'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy14'] <- '2014'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy13'] <- '2013'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy12'] <- '2012'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy11'] <- '2011'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy10'] <- '2010'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy09'] <- '2009'
+
+# plot levels
+  ggplot(df_aor_long) + 
+    geom_histogram(mapping = aes(x = adp))
+  
+# plot adp by fiscal year across aor
+ggplot(data = df_aor_long,
+       aes(x = fiscal_year, y = adp, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Average Daily Population (ADP)") +
+ # ggtitle("Average Daily Population (ADP), 2009-2018") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+# plot adp by fiscal year across aor facet wrap 
+ggplot(data = df_aor_long,
+       aes(x = fiscal_year, y = adp, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Average Daily Population (ADP)") +
+ # ggtitle("Average Daily Population (ADP), 2009-2018") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+# # plot
+# ggplot(data = df_aor_long, aes(x = fiscal_year, y = adp, group = aor)) + 
+#   geom_line() + 
+#   geom_line(stat = "smooth", method = "loess", 
+#             aes(group = aor)) + 
+#   facet_wrap(~ aor)
 ```
 
+I explore the distribution of each of the average daily population (ADP) variables in the ICE facilities dataset. For continuous variables, we can measure the centrality and the spread.  Measures of centrality are mean, median. Measures of spread are standard deviation, quantiles, min and max, range, interquartile range.
+
+Second, I create new variables with functions of existing variables (mutate()).
+
+Third, I collapse many values down to a single summary (summarise()). I use these in conjunction with group_by() which changes the scope of each function from operating on the entire dataset to operating on it group-by-group.
+
+summarise() is not terribly useful unless we pair it with group_by(). This changes the unit of analysis from the complete dataset to individual groups. Then, when you use the dplyr verbs on a grouped data frame they’ll be automatically applied “by group”. For example, if we applied exactly the same code to a data frame grouped by date, we get the average delay per date:
 
 
 
+Because our unit of analysis is the AOR, I change the scope of each function from operating on the entire dataset to operating on it group-by-group. That is, I collapse the many facility-level values down to a single summary at the AOR-level and by year.
 
 
-I explore the distribution of each of the average daily population (ADP) variables in the ICE facilities dataset.
+I reshape the wide AOR-level data to long.
 
-For continuous variables, we can measure the centrality and the spread.  Measures of centrality are mean, median. Measures of spread are standard deviation, quantiles, min and max, range, interquartile range.
+```{r pivoting_df_facilities_long, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 
-Second, create new variables with functions of existing variables (mutate()).
-
-Third, collapse many values down to a single summary (summarise()). I use these in conjunction with group_by() which changes the scope of each function from operating on the entire dataset to operating on it group-by-group.
-
-
-
-
-Because our unit of analysis is the AOR, I change the scope of each function from operating on the entire dataset to operating on it group-by-group. That is, I collapse the many facility-level values down to a single summary at the AOR-level.
-
-### Area of Responsibility (AOR)
-There are three steps to prepare these data. First, I group facilities by area of responsibility (AOR). Second, I summarize across AORs to compute average daily population and number of facilities.
-
-```{r df.aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-# by_aor <- df %>% 
-#   select(Facility_AOR, DETLOC, Facility_City, Facility_Zip, everything()) %>%
-#   arrange(Facility_AOR, DETLOC, Facility_City, Facility_Zip)
-by_aor <- df
-# count number of unique AORs
-by_aor %>%
-  count(Facility_AOR) # 214 facilities in 24 AORs 
-  #df %>% count(n_distinct(Facility_AOR))
-  # unique(df$Facility_AOR)
-  # count number of AORs
- # df %>% group_by(Facility_AOR) %>% tally() %>% pander()
-
-# view AORs with a bar chart
-by_aor %>%
-  mutate(Facility_AOR = Facility_AOR %>% fct_infreq() %>% fct_rev()) %>%
-  ggplot(aes(Facility_AOR)) +
-    geom_bar() +
-    theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
-
-# aggregate facilities to AOR
-by_aor <- by_aor %>%
-  #select(Facility_AOR, everything()) %>%
-  group_by(Facility_AOR) %>% 
-  mutate(N_DETLOC = n_distinct(DETLOC),
-         N_City = n_distinct(Facility_City),
-         N_State = n_distinct(Facility_State),
-         N_Zip = n_distinct(Facility_Zip)) %>%
-  group_by(Facility_AOR, N_DETLOC, N_City, N_State, N_Zip) %>%
-  summarize_at(vars(starts_with("FY")), mean) %>%
-#summarize_at(vars(starts_with("FY")), list(Mean = mean, Count = sum))
-  ungroup()
-
-by_aor %>%
-  count(Facility_AOR)
-    # mutate_at(vars(starts_with("FY")), sum)
-
-# by_aor <- by_aor %>%
-#   rename(FY19_ADP = FY19_ADP_Mean) %>%
-#   rename(FY18_ADP = FY18_ADP_Mean) %>%
-#   rename(FY17_ADP = FY17_ADP_Mean) %>%
-#   rename(FY16_ADP = FY16_ADP_Mean) %>%
-#   rename(FY15_ADP = FY15_ADP_Mean) %>%
-#   rename(FY14_ADP = FY14_ADP_Mean) %>%
-#   rename(FY13_ADP = FY13_ADP_Mean) %>%
-#   rename(FY12_ADP = FY12_ADP_Mean) %>%
-#   rename(FY11_ADP = FY11_ADP_Mean) %>%
-#   rename(FY19_ADP_Male_Crim = FY19_ADP_Male_Crim_Mean) %>%
-#   rename(FY19_ADP_Male_NonCrim = FY19_ADP_Male_NonCrim_Mean) %>%
-#   rename(FY19_ADP_Female_Crim =  FY19_ADP_Female_Crim_Mean) %>%
-#   rename(FY19_ADP_Female_NonCrim = FY19_ADP_Female_NonCrim_Mean) %>%
-#   rename(FY19_InitialBookins =  FY19_InitialBookins_Mean) %>%
-#   rename(FY18_InitialBookins = FY18_InitialBookins_Mean) %>%
-#   rename(FY17_InitialBookins = FY17_InitialBookins_Mean) %>%
-#   rename(FY16_InitialBookins = FY16_InitialBookins_Mean) %>%
-#   rename(FY15_InitialBookins = FY15_InitialBookins_Mean) %>%
-#   rename(FY14_InitialBookins = FY14_InitialBookins_Mean) %>%
-#   rename(FY13_InitialBookins = FY13_InitialBookins_Mean) %>%
-#   rename(FY12_InitialBookins = FY12_InitialBookins_Mean) %>%
-#   rename(FY11_InitialBookins = FY11_InitialBookins_Mean) # %>%
-#   rename(FY19_ADP_Total = FY19_ADP_Count) %>%
-#   rename(FY18_ADP_Total = FY18_ADP_Count) %>%
-#   rename(FY17_ADP_Total = FY17_ADP_Count) %>%
-#   rename(FY16_ADP_Total = FY16_ADP_Count) %>%
-#   rename(FY15_ADP_Total = FY15_ADP_Count) %>%
-#   rename(FY14_ADP_Total = FY14_ADP_Count) %>%
-#   rename(FY13_ADP_Total = FY13_ADP_Count) %>%
-#   rename(FY12_ADP_Total = FY12_ADP_Count) %>%
-#   rename(FY11_ADP_Total = FY11_ADP_Count) %>%
-#   rename(FY19_ADP_Male_Crim_Total = FY19_ADP_Male_Crim_Count) %>%
-#   rename(FY19_ADP_Male_NonCrim_Total = FY19_ADP_Male_NonCrim_Count) %>%
-#   rename(FY19_ADP_Female_Crim_Total =  FY19_ADP_Female_Crim_Count) %>% 
-#   rename(FY19_ADP_Female_NonCrim_Total = FY19_ADP_Female_NonCrim_Count) %>%
-#   rename(FY19_InitialBookins_Total =  FY19_InitialBookins_Count) %>% 
-#   rename(FY18_InitialBookins_Total = FY18_InitialBookins_Count) %>% 
-#   rename(FY17_InitialBookins_Total = FY17_InitialBookins_Count) %>% 
-#   rename(FY16_InitialBookins_Total = FY16_InitialBookins_Count) %>% 
-#   rename(FY15_InitialBookins_Total = FY15_InitialBookins_Count) %>% 
-#   rename(FY14_InitialBookins_Total = FY14_InitialBookins_Count) %>% 
-#   rename(FY13_InitialBookins_Total = FY13_InitialBookins_Count) %>% 
-#   rename(FY12_InitialBookins_Total = FY12_InitialBookins_Count) %>% 
-#   rename(FY11_InitialBookins_Total = FY11_InitialBookins_Count)
-```
-
-
-```{r pivoting_aor, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
-# View(df)
-# View(by_aor)
-
-by_aor_long <- by_aor %>%
+# pivot wide to long
+df_facilities_long <- df_facilities %>%
   pivot_longer(
-    cols = starts_with("FY"),
+    cols = starts_with("fy"),
     names_to = "key",
     values_to = "cases",
-  )  %>% 
+  ) 
+
+%>% 
   separate(key, 
-           c("Fiscal_Year", 
-             "Type", 
-             "Sex",
-             "Offense"), 
+           c("fiscal_year", 
+             "adp"), 
            sep = "_"
            ) %>% 
-  pivot_wider(names_from = c(Type, Sex, Offense), 
-              values_from = cases)
-# View(by_aor_long)
-
-# rename columns
-by_aor_long <- by_aor_long %>%
-  rename(ADP = ADP_NA_NA) %>%
-  rename(InitialBookins = InitialBookins_NA_NA)
+  group_by(aor) %>%
+  mutate(row = row_number()) %>% 
+  pivot_wider(names_from = c(adp), 
+              values_from = cases) %>%
+  select(-row) 
+View(df_aor_long)
 
 # convert to factor
-by_aor_long <- by_aor_long %>%
-  mutate(Fiscal_Year = as.factor(Fiscal_Year))
-class(by_aor_long) 
+df_aor_long <- df_aor_long  %>%
+  mutate(fiscal_year = as.factor(fiscal_year))
+class(df_aor_long$fiscal_year) 
 
 # recode variable values
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY19'] <- '2019'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY18'] <- '2018'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY17'] <- '2017'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY16'] <- '2016'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY15'] <- '2015'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY14'] <- '2014'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY13'] <- '2013'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY12'] <- '2012'
-levels(by_aor_long$Fiscal_Year)[levels(by_aor_long$Fiscal_Year)=='FY11'] <- '2011'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy18'] <- '2018'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy17'] <- '2017'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy16'] <- '2016'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy15'] <- '2015'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy14'] <- '2014'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy13'] <- '2013'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy12'] <- '2012'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy11'] <- '2011'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy10'] <- '2010'
+levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy09'] <- '2009'
+
+# calculate summary statistics
+  summary(select(df_aor_long, adp))
+  
+  # plot levels
+  ggplot(df_aor_long) + 
+    geom_histogram(mapping = aes(x = adp))
 ```
 
+Arrests are individual-level data with variables identifying AOR as well as apprehension date. I will summarize arrests by year within each AOR. I will then merge the arrests data with data on ADP by AOR. 
+
+```{r arrests_df_aor, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# aggregate arrests to AOR-level
+View(df_arrests)
+
+# separate apprehension date into month, day, and year
+df_arrests <- df_arrests %>% 
+  separate(apprehension_date, into = c("apprehension_month", "apprehension_day", "apprehension_year")) %>%
+  rename(fiscal_year = apprehension_year)
+
+# collapse arrests to summarize aor
+df_arrests_aor <- df_arrests %>%
+  group_by(aor, fiscal_year) %>% 
+  summarize(n_arrests = n()) %>%
+  ungroup()
+View(df_arrests_aor)
+
+# join aor-level adp and arrests data
+newdf <- df_aor_long %>%
+  left_join(df_arrests_aor, 
+            by = c("aor", "fiscal_year"))
+
+# convert to factor
+newdf <- newdf %>%
+  mutate(aor = as.factor(aor), 
+         fiscal_year = as.factor(fiscal_year)
+         )
+
+# calculate summary statistics
+summary(newdf$n_arrests)
+
+
+# plot density curve
+ggplot(newdf, aes(x = n_arrests)) + geom_density()
+ggplot(newdf, aes(x = log(n_arrests))) + geom_density()
+
+# plot bar graph
+ggplot(newdf, aes(x=n_arrests)) + 
+  geom_histogram(colour="black", fill="white")
+
+  
+ggplot(newdf, aes(x=log(n_arrests))) +
+    geom_histogram(colour="black", fill="white")
+
+# plot levels
+  ggplot(newdf) + 
+    geom_histogram(mapping = aes(x = n_arrests), binwidth = 300, na.rm = TRUE)
+  
+# plot adp by fiscal year across aor
+ggplot(data = newdf,
+       aes(x = fiscal_year, y = n_arrests, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Arrests") +
+ # ggtitle("Average Daily Population (ADP), 2009-2018") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+# plot adp by fiscal year across aor facet wrap 
+ggplot(data = newdf,
+       aes(x = fiscal_year, y = n_arrests, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Arrests") +
+ # ggtitle("Average Daily Population (ADP), 2009-2018") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+
+
+
+# plot association between adp and arrests
+newdf %>%
+  # filter(!is.na(adp) & !is.na(n_arrests)) %>% 
+    ggplot(aes(x = adp, y = n_arrests)) +
+      geom_point() + 
+      geom_smooth()
+
+# plot again after removing outliers
+newdf %>%
+  filter(!is.na(adp) & !is.na(n_arrests) & adp < 5000) %>% 
+    ggplot(aes(x = adp, y = n_arrests)) +
+      geom_point(na.rm = TRUE) + 
+      geom_smooth()
+
+
+ggplot(newdf, aes(adp, n_arrests)) + geom_boxplot()
+
+
+
+# https://murraylax.org/rtutorials/regression_intro.html
+
+
+mod <- lm(log(n_arrests) ~ log(adp), data = newdf)
+
+mod$coefficients
+
+ggplot(data = newdf, mapping = aes(x = adp, y = n_arrests)) + 
+  geom_point(position = "jitter") + 
+  labs(title = "Effects of ADP on Arrests",
+       x = "Average Daily Population",
+       y = "Arrests") + 
+  geom_smooth(method = "lm") + 
+  theme_bw()
+
+newdf2 <- newdf %>%
+  add_residuals(mod) %>%
+  mutate(resid = exp(resid))
+
+ggplot(data = newdf2) + 
+  geom_point(mapping = aes(x = adp, y = resid))
+```
+The v
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# aggregate arrests to AOR and year
+arrests_df_aor <- test %>%
+  group_by(aor, year) %>% 
+  mutate(n_apprehension_method = n_distinct(apprehension_method),
+         n_apprehension_landmark = n_distinct(apprehension_landmark),
+         n_proccessing_disposition = n_distinct(processing_disposition), 
+         n_citizenship = n_distinct(citizenship),
+         n_gender = n_distinct(gender)) %>%
+  group_by(aor, year, n_apprehension_method, n_apprehension_landmark, n_proccessing_disposition, n_citizenship, n_gender) %>%
+  summarize_at(vars(contains("aor"))) %>% 
+  ungroup()
+
+
+
+# summarize number
+# aor
+# check levels
+class(df_arrests$aor)
+
+df_arrests %>%
+  count(aor)
+
+# verify unique IDs
+df_arrests %>%
+  count(aor) %>%
+  filter(n > 1) # rows are unique except for "redacted" obs (n = 207)
+                # redacted obs are type == "ORR"
+
+df_arrests %>%
+  summarise(count = n_distinct(aor)) # 1479 unique obs
+
+
+levels(as.factor(df_arrests$aor))
+"ATL" Atlanta
+"BAL" Baltimore
+"BOS" Boston
+"BUF" Buffalo
+"CHI" Chicago
+"DAL" Dallas
+"DEN" Denver
+"DET" Detroit
+"ELP" El Paso
+"HOU" Houston
+"HQ" 
+"LOS" Los Angeles Area of Responsibility: Los Angeles Metropolitan Area (Counties of Los Angeles, Orange, Riverside, San Bernardino), and Central Coast (Counties of Ventura, Santa Barbara and San Luis Obispo)
+"MIA" Miami
+"NEW" Newark
+"NOL" New Orleans
+"NYC" New York City
+"PHI" Philadelphia
+"PHO" Phoenix Area of Responsibility: Arizona
+"SEA" Seattle
+"SFR" San Francisco
+"SLC" Salt Lake City
+"SNA" San Antonio
+"SND" San Diego
+"SPM" St Paul
+"WAS" Washington (VA)
+
+
+df_arrests %>% 
+  filter(detloc != "Redacted") %>% # filter out redacted obs
+  summarise(count = n_distinct(detloc)) # 1478 unique obs
+
+# convert to factor
+df_arrests <- df %>%
+  mutate(detloc = as.factor(detloc))
+
+df_arrests %>%
+  count(aor, apprehension_date) 
+
+
+
+```
 
 With the facility-level data structured in both long and wide formats, we can start to describe univariate statistics and covariation between variables of interest using numerical summaries and graphical displays.
 
 The following analyses describes the ICE facilities dataset, which includes both continuous and categorical variables. A variable is continuous if it can take any of an infinite set of ordered values (e.g., income). There are several different plots that can effectively communicate the different features of continuous variables. Features I am generally interested in include measures of location and spread, symmetry, and outliers. In contrast, a categorical variable is a variable that can take on one of a limited, and usually fixed, number of possible values, assigning each individual or other unit of observation to a particular group or nominal category on the basis of some qualitative property (e.g., race-ethnicity, gender, citizenship). There are a few different plots that can effectively communicate features of categorical variables. The features of these variables in which I am generally interested cover counts and proportions.
+
+
 
 # Exploratory Data Analysis (EDA)
 The CMTO project collects data on the characteristics of both households and individuals within those households. This survey includes information on facility location, household composition and characteristics, and socioeconomic characteristics. First, the geographic context in which households are situated is determined. Second, households within these geographies are characterized by wealth, size, number of children, age and sex composition and structure, and expenditures on rental units. Third, individual-level indicators provide additional characteristics of household head, children, and other household members. These data on individuals are collected on variables such as race-ethnicity, gender, age, homeless status, disability status, relationship to the household head. 
@@ -984,16 +904,16 @@ The full sample, however, is much larger. The total number of participants and h
 #   mutate(rate = cases / population * 10000)
 
 # visualize changes over time
-aor_by_year <- ggplot(data = by_aor_long, 
-       aes(x = Fiscal_Year, y = ADP, 
-           group = Facility_AOR)) +
+aor_by_year <- ggplot(data = df_aor_long, 
+       aes(x = fiscal_year, y = adp, 
+           group = aor)) +
   geom_line() +
   xlab("Year") + 
   ylab("Average Daily Population") +
   ggtitle("Average Daily Population, 2011--2019") +
   theme_bw(base_size=8) + 
-  theme(axis.text.x = element_text(angle = 90, size = 10)) +
-  facet_wrap(~ Facility_AOR)
+  theme(axis.text.x = element_text(angle = 90, size = 10)) #+
+ # facet_wrap(~ aor)
 
 aor_by_year
 ```
@@ -1122,960 +1042,15 @@ Of the new admissions, a total of `r df.demog.newadmission.child %>% summarize(c
 ```
 By contrast, the data frame subsetting on issuance of vouchers has a total number of participants equal to `r df.demog.issuance %>% summarise(count = n_distinct(member_ssn))`. The total number of households in this truncated dataset amounts to `r df.demog.issuance %>% summarise(count = n_distinct(entityid))`. For households issued vouchers, `r df.demog.issuance.child %>% summarize(count = n_distinct(entityid))` have youth who are between 15 and 18 years of age.
 
+I tidy these data to then facilitate their transformation and visualization. I describe univariate statistics and covariation between variables I observe for the purpose of modelling associations among immigration detention facilities, interior immigration law enforcement practices, and immigration bail bonds.
 
 
 ## Summarizing and visualizing distributions
-
 
 It is important to be able to understand how an individual variable is distributed before moving on to more sophisticated visualizations that enable multidimensional investigation. Visually understanding the distribution allows us to describe many features of a variable.
 
 ### Variation
 I first present several numerical summaries and create graphical displays showing the univariate distributions of different variables that are of interest to the Human Rights at Home project .
-
-#### Creating Moves to Opportunity (CMTO) treatment
-```{r newadmission_hoh_cmto_treatment_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# plot distribution
-ggplot(df.demog.newadmission.hoh, aes(cmto_treatment)) + 
-  geom_bar(fill = 'thistle') +
-  theme_minimal() +
-  labs(x = 'CMTO Treatment', y = 'Count',
-       title = 'Number of Households by Treatment Group',
-       subtitle = 'New Admissions')
-names(df.demog.newadmission.hoh)
-
-# check proportions
-table(df.demog.newadmission.hoh$cmto_treatment)
-  tab1 <- table(df.demog.newadmission.hoh$cmto_treatment)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  left_join(
-    df.demog.newadmission.hoh %>% 
-      group_by(cmto_treatment) %>% 
-      summarize(n = n()) %>% 
-      mutate(cmto_treatment_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission.hoh$n <- NULL
-```
-CMTO households who were new admissions comprise `r round(0.4722222*100, digits = 2)` percent of the treatment group in this sample. Comparatively, approximately `r round(0.5277778*100, digits = 2)` percent of households were in the control group.
-```{r newadmission_cmto_treatment_vis, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# plot distribution
-ggplot(df.demog.newadmission, aes(cmto_treatment)) + 
-  geom_bar(fill = 'thistle') +
-  theme_minimal() +
-  labs(x = 'CMTO Treatment', y = 'Count',
-       title = 'Number of Participants by Treatment Group',
-       subtitle = 'New Admissions')
-names(df.demog.newadmission)
-
-# check proportions
-table(df.demog.newadmission$cmto_treatment)
-  tab1 <- table(df.demog.newadmission$cmto_treatment)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission <- df.demog.newadmission %>% 
-  left_join(
-    df.demog.newadmission %>% 
-      group_by(cmto_treatment) %>% 
-      summarize(n = n()) %>% 
-      mutate(cmto_treatment_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission$n <- NULL
-
-#Of the new admission sample, `r round(0.5324427 * 100, digits = 2)` percent are in the treatment condition and `r round(0.4675573 * 100, digits = 2)` percent are in the control group.
-```
-
-Issuances of vouchers, in contrast, appear to be symmetrically distributed between treatment and control groups. 
-```{r issuance_hoh_cmto_treatment_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# plot distribution
-ggplot(df.demog.issuance.hoh, aes(cmto_treatment)) + 
-  geom_bar(fill = 'thistle') +
-  theme_minimal() +
-  labs(x = 'CMTO Treatment', y = 'Count',
-       title = 'Number of Households by Treatment Group',
-       subtitle = 'Issuance of Vouchers')
-names(df.demog.issuance.hoh)
-
-# check proportions
-table(df.demog.issuance.hoh$cmto_treatment)
-  tab1 <- table(df.demog.issuance.hoh$cmto_treatment)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(cmto_treatment) %>% 
-      summarize(n = n()) %>% 
-      mutate(cmto_treatment_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-```
-
-Among certification type `Issuance of Voucher`, households in the control group made up `r round(0.5025381*100, digits = 2)` of the total sample while households in the treatment group accounted for `r round(0.4974619*100, digits = 2)` of the share.
-
-```{r issuance_cmto_treatment_vis, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# plot distribution
-ggplot(df.demog.issuance, aes(cmto_treatment)) + 
-  geom_bar(fill = 'thistle') +
-  theme_minimal() +
-  labs(x = 'CMTO Treatment', y = 'Count',
-       title = 'Number of Participants by Treatment Group',
-       subtitle = 'Issuance of Vouchers')
-names(df.demog.issuance)
-
-# check proportions
-table(df.demog.issuance$cmto_treatment)
-  tab1 <- table(df.demog.issuance$cmto_treatment)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance <- df.demog.issuance %>% 
-  left_join(
-    df.demog.issuance %>% 
-      group_by(cmto_treatment) %>% 
-      summarize(n = n()) %>% 
-      mutate(cmto_treatment_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance$n <- NULL
-```
-
-##### Race-ethnicity
-Race-ethnicity refers to the racial or ethnic group with which a person identified himself or herself.
-
-```{r newadmission_race_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.newadmission %>%
-  count(race_ethnicity)
-
-# check levels by entityid
-df.demog.newadmission %>% 
-  group_by(entityid, race_ethnicity) %>% 
-  summarize(n = n()) %>%
-  spread(key = entityid, value = n)
-
-# check proportions
-table(df.demog.newadmission$race_ethnicity)
-  tab1 <- table(df.demog.newadmission$race_ethnicity)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission <- df.demog.newadmission %>% 
-  left_join(
-    df.demog.newadmission %>% 
-      group_by(race_ethnicity) %>% 
-      summarize(n = n()) %>% 
-      mutate(race_ethnicity_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission$n <- NULL
-
-
-# plot levels
-ggplot(df.demog.newadmission, aes(race_ethnicity)) + 
-  geom_bar(fill='darkblue') +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 40, vjust = .75)) +
-  labs(x = 'Race-ethnicity', y = 'Count',
-       title = 'Number of Participants by Race-ethnicity',
-              subtitle = 'New Admissions')
-```
-
-The bar chart above indicates the racial and ethnic distribution of the full sample of new admissions, with the majority of participants self-identifying with the African American/Black category. Approximately `r round(0.530534351 * 100)` percent of the CMTO sample identified as African American or Black. Together, the remaining ethnoracial groups make-up `r round((0.062977099 + 0.122137405 + 0.051526718 + 0.009541985 + 0.019083969 + 0.204198473) * 100, digits = 2)` percent of the population. Less than one percent of the sample is indigenous (`r round(0.009541985, digits = 2)` percent) or Native Hawaiian (`r round(0.019083969, digits = 2)` percent). Asian participants constitute approximately `r round(0.062977099 * 100, digits = 2)` percent of the overall sample. Respondents identifying as white are the second largest group represented in these data (`r round(0.204198473 * 100, digits = 2)` percent), while the Latinx community comprises the third largest group (`r round(0.122137405 * 100, digits = 2)` percent). Multi-racial participants made up about `r round(0.051526718 * 100, digits = 2)` percent of the total respondents.
-
-```{r issuance_race_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.issuance %>%
-  count(race_ethnicity)
-
-# check levels by entityid
-df.demog.issuance %>% 
-  group_by(entityid, race_ethnicity) %>% 
-  summarize(n = n()) %>%
-  spread(key = entityid, value = n)
-
-# check proportions
-table(df.demog.issuance$race_ethnicity)
-  tab1 <- table(df.demog.issuance$race_ethnicity)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance <- df.demog.issuance %>% 
-  left_join(
-    df.demog.issuance %>% 
-      group_by(race_ethnicity) %>% 
-      summarize(n = n()) %>% 
-      mutate(race_ethnicity_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance$n <- NULL
-
-
-# plot levels
-ggplot(df.demog.issuance, aes(race_ethnicity)) + 
-  geom_bar(fill='darkblue') +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 40, vjust = .75)) +
-  labs(x = 'Race-ethnicity', y = 'Count',
-       title = 'Number of Participants by Race-ethnicity',
-       subtitle = 'Issuance of Vouchers') 
-```
-
-For individuals with an issued voucher, approximately `r round(0.54458162 * 100, digits = 2)` percent self-identify as African American or Black. A little over one percent of the sample is indigenous (`r round(0.01097394 * 100, digits = 2)` percent). Native Hawaiians represent approximately `r round(0.03429355 * 100, digits = 2)` percent of the total sample. Asian participants constitute approximately `r round(0.05486968 * 100, digits = 2)` percent of the overall sample. Respondents identifying as white are also the second largest group represented among this sample of the data (`r round(0.19753086 * 100, digits = 2)` percent). Similarly, the Latinx community comprises `r round(0.11111111  * 100, digits = 2)` percent of those persons who were issued a voucher. Multi-racial participants made up about `r round(0.04663923 * 100, digits = 2)` percent of the total respondents.
-
-##### Age
-Numerical and graphical summaries below display the age distribution of CMTO participants.
-
-```{r newadmission_age_num_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.newadmission %>%
-  count(age_num)
-
-df.demog.newadmission %>%
-  summarise(count = n_distinct(age_num)) # 62 unique ages
-
-# check proportions
-table(df.demog.newadmission$age_num)
-  tab1 <- table(df.demog.newadmission$age_num)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission <- df.demog.newadmission %>% 
-  left_join(
-    df.demog.newadmission %>% 
-      group_by(age_num) %>% 
-      summarize(n = n()) %>% 
-      mutate(age_num_prop_newadmission = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission$n <- NULL
-
-## create a reusable ggplot object
-#gg_prop <- ggplot(data = data.frame()
-#                  , aes(x = age_num, y = age_num_prop)) + 
-#  geom_bar(stat = 'identity', position = 'dodge', alpha = 2/3) +  
-#  scale_y_continuous(labels = percent) + 
-#  labs(x = 'Age (years)', y = NULL,
-#       title = 'Proportions in Age')  # what's the reader looking at?
-#gg_prop %+%   # use %+% to add...
-#  df.demog.newadmission    # a dataframe
-
-# plot levels
-ggplot(df.demog.newadmission, aes(age_num)) + 
-  geom_bar(fill = 'darkred') +
-  theme_minimal() +
-  labs(x = 'Age (years)', y = 'Count',
-       title = 'Number of Participants by Age',
-       subtitle = 'New Admissions')
-
-# summarize variable
-summary(df.demog.newadmission$age_num)
-```
-
-The graph shows age ranges from `r min(df.demog.newadmission$age_num)` (i.e., less than a year old) to `r max(df.demog.newadmission$age_num)` years, with `r df.demog.newadmission %>% summarise(count = n_distinct(age_num))` different ages represented. These data also suggest that the full CMTO sample is young. For example, the median age of `r round(median(df.demog.newadmission$age_num))` is smaller than the mean age of `r round(mean(df.demog.newadmission$age_num))`, suggesting the distribution of this variable is skewed right. Individuals in the sample of voucher-holders reflect a similar age distribution as those in the sample of new admissions.
-
-```{r issuance_age_num_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.issuance %>%
-  count(age_num)
-
-df.demog.issuance %>%
-  summarise(count = n_distinct(age_num)) # 62 unique ages
-
-# check proportions
-table(df.demog.issuance$age_num)
-  tab1 <- table(df.demog.issuance$age_num)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance <- df.demog.issuance %>% 
-  left_join(
-    df.demog.issuance %>% 
-      group_by(age_num) %>% 
-      summarize(n = n()) %>% 
-      mutate(age_num_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance$n <- NULL
-
-# plot levels
-ggplot(df.demog.issuance, aes(age_num)) + 
-  geom_bar(fill = 'darkred') +
-  theme_minimal() +
-  labs(x = 'Age (years)', y = 'Count',
-       title = 'Number of Participants by Age',
-       subtitle = 'Issuance of Vouchers')
-
-# summarize variable
-summary(df.demog.issuance$age_num)
-```
-
-##### Household family size
-Household family size captures the number of own family members residing with each individual considered to be the head of the household, including the person her/himself. This statistic excludes live-in aids.
-
-```{r newadmission_hh_fam_size_vis, eval = TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.newadmission.hoh %>%
-  count(hh_fam_size)
-
-# plot levels
-ggplot(df.demog.newadmission.hoh, aes(factor(hh_fam_size))) + 
-  geom_bar(fill = '#56B4E9') +
-  theme_minimal() +
-  labs(x = 'Household family size', y = 'Count',
-       title = 'Size of Family Household') 
-
-# check proportions
-table(df.demog.newadmission.hoh$hh_fam_size)
-  tab1 <- table(df.demog.newadmission.hoh$hh_fam_size)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  left_join(
-    df.demog.newadmission.hoh %>% 
-      group_by(hh_fam_size) %>% 
-      summarize(n = n()) %>% 
-      mutate(hh_fam_size_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission.hoh$n <- NULL
-
-# generate average family size
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  mutate(avg_hh_fam_size_num = mean(hh_fam_size))
-```
-
-Family size varies across new admissions. However, the vast majority of families live in households with two to five members. The distribution for vouchers issued is graphed below.
-
-```{r issuance_hh_fam_size_vis, eval = TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.issuance.hoh %>%
-  count(hh_fam_size)
-
-# plot levels
-ggplot(df.demog.issuance.hoh, aes(factor(hh_fam_size))) + 
-  geom_bar(fill = '#56B4E9') +
-  theme_minimal() +
-  labs(x = 'Household family size', y = 'Count',
-       title = 'Size of Family Household',
-       subtitle = 'Issuance of Vouchers') 
-
-# check proportions
-table(df.demog.issuance.hoh$hh_fam_size)
-  tab1 <- table(df.demog.issuance.hoh$hh_fam_size)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(hh_fam_size) %>% 
-      summarize(n = n()) %>% 
-      mutate(hh_fam_size_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-
-# generate average family size
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  mutate(avg_hh_fam_size_num = mean(hh_fam_size))
-```
-
-##### Gender
-```{r newadmission_gender_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.newadmission %>%
-  count(member_gender)
-  # check levels of number of rooms
-    # levels(df.demog.newadmission$hh_fam_size)
-
-# plot levels
-ggplot(df.demog.newadmission, aes(member_gender)) + 
-  geom_bar(fill = 'chartreuse') +
-  theme_minimal() +
-  labs(x = 'Gender', y = 'Count',
-       title = 'Number of Participants by Gender',
-       subtitle = 'New Admissions') 
-
-# check proportions
-table(df.demog.newadmission$member_gender)
-  tab1 <- table(df.demog.newadmission$member_gender)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission <- df.demog.newadmission %>% 
-  left_join(
-    df.demog.newadmission %>% 
-      group_by(member_gender) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_gender_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission$n <- NULL
-```
-
-Participants in the CMTO program are overwhelmingly female in the full sample. The above chart indicates, for instance, shows that females are `r round(max(df.demog.newadmission$member_gender_prop), digits = 2)` percent of new admissions. Males comprise about `r round(min(df.demog.newadmission$member_gender_prop), digits = 2)` percent of new admissions. However, analyses of gender by head of household status displays different results.
-
-```{r newadmission_hoh_gender_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.newadmission.hoh %>%
-  count(member_gender)
-
-# plot levels
-ggplot(df.demog.newadmission.hoh, aes(member_gender)) + 
-  geom_bar(fill = 'chartreuse') +
-  theme_minimal() +
-  labs(x = 'Gender', y = 'Count',
-       title = 'Number of Participants by Gender',
-       subtitle = 'New Admissions') 
-
-# check proportions
-table(df.demog.newadmission.hoh$member_gender)
-  tab1 <- table(df.demog.newadmission.hoh$member_gender)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  left_join(
-    df.demog.newadmission.hoh %>% 
-      group_by(member_gender) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_gender_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission.hoh$n <- NULL
-```
-
-Approximately `r round(max(df.demog.newadmission.hoh$member_gender_prop), digits = 2)` percent of household heads are female, compared with `r round(min(df.demog.newadmission.hoh$member_gender_prop), digits = 2)`.
-
-For issuances of vouchers, `r round(max(df.demog.issuance.hoh$member_gender_prop), digits = 2)` percent are female while the percent of male-headed households is `r round(min(df.demog.issuance.hoh$member_gender_prop), digits = 2)`. These results are similar to new admissions.
-
-```{r issuance_gender_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.issuance %>%
-  count(member_gender)
-
-# plot levels
-ggplot(df.demog.issuance, aes(member_gender)) + 
-  geom_bar(fill = 'chartreuse4') +
-  theme_minimal() +
-  labs(x = 'Gender', y = 'Count',
-       title = 'Number of Participants by Gender',
-       subtitle = 'Issuance of Vouchers') 
-
-# check proportions
-table(df.demog.issuance$member_gender)
-  tab1 <- table(df.demog.issuance$member_gender)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance <- df.demog.issuance %>% 
-  left_join(
-    df.demog.issuance %>% 
-      group_by(member_gender) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_gender_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance$n <- NULL
-```
-
-
-```{r issuance_hoh_gender_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.issuance.hoh %>%
-  count(member_gender)
-
-# plot levels
-ggplot(df.demog.issuance.hoh, aes(member_gender)) + 
-  geom_bar(fill = 'chartreuse4') +
-  theme_minimal() +
-  labs(x = 'Gender', y = 'Count',
-       title = 'Number of Participants by Gender',
-       subtitle = 'Issuance of Vouchers') 
-
-# check proportions
-table(df.demog.issuance.hoh$member_gender)
-  tab1 <- table(df.demog.issuance.hoh$member_gender)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(member_gender) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_gender_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-```
-
-
-##### Citizenship
-
-```{r newadmission_hoh_citizenship_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.newadmission.hoh %>%
-  count(member_citizenship)
-
-# plot levels
-ggplot(df.demog.newadmission.hoh, aes(member_citizenship)) + 
-  geom_bar(fill = 'royalblue3') +
-  theme_minimal() +
-  labs(x = 'Citizenship Status', y = 'Count',
-       title = 'Number of Participants by Citizenship Status') 
-
-# check proportions
-table(df.demog.newadmission.hoh$member_citizenship)
-  tab1 <- table(df.demog.newadmission.hoh$member_citizenship)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  left_join(
-    df.demog.newadmission.hoh %>% 
-      group_by(member_citizenship) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_citizenship_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission.hoh$n <- NULL
-```
-
-Most CMTO participants are considered to be citizens eligible for services (i.e., `r round(max(df.demog.newadmission.hoh$member_citizenship_prop), digits = 2)`). Noncitizens who are eligible for services comprise `r round(0.81250000*100, digits= 2)`. Ineligible noncitizens constitute `r round(0.02777778*100, digits = 2)` of the overall households represented in the sample of new admissions.
-
-
-
-```{r issuance_hoh_citizenship_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.issuance.hoh %>%
-  count(member_citizenship)
-
-# plot levels
-ggplot(df.demog.issuance.hoh, aes(member_citizenship)) + 
-  geom_bar(fill = 'royalblue3') +
-  theme_minimal() +
-  labs(x = 'Citizenship Status', y = 'Count',
-       title = 'Number of Participants by Citizenship Status') 
-
-# check proportions
-table(df.demog.issuance.hoh$member_citizenship)
-  tab1 <- table(df.demog.issuance.hoh$member_citizenship)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(member_citizenship) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_citizenship_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-```
-
-##### Homeless
-```{r newadmission_hoh_homeless_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.newadmission.hoh %>%
-  count(homeless)
-
-# plot levels
-ggplot(df.demog.newadmission.hoh, aes(homeless)) + 
-  geom_bar(fill = 'green4') +
-  theme_minimal() +
-  labs(x = 'Homeless Status', y = 'Count',
-       title = 'Number of Households by Homeless Status') 
-
-# check proportions
-table(df.demog.newadmission.hoh$homeless)
-  tab1 <- table(df.demog.newadmission.hoh$homeless)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  left_join(
-    df.demog.newadmission.hoh %>% 
-      group_by(homeless) %>% 
-      summarize(n = n()) %>% 
-      mutate(homeless_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission.hoh$n <- NULL
-```
-
-No Yes 
- 97  47 
-
-       No       Yes 
-
-The status of homelessness among households were similar in both samples. That is, approximately
-`r round(0.6736111*100, digits = 2)` percent of households were not homeless, while `r round(0.3263889*100, digits = 2) percent reported having experienced homelessness.
-
-```{r issuance_hoh_homeless_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.issuance.hoh %>%
-  count(homeless)
-
-# plot levels
-ggplot(df.demog.issuance.hoh, aes(homeless)) + 
-  geom_bar(fill = 'green4') +
-  theme_minimal() +
-  labs(x = 'Homeless Status', y = 'Count',
-       title = 'Number of Participants by Homeless Status') 
-
-# check proportions
-table(df.demog.issuance.hoh$homeless)
-  tab1 <- table(df.demog.issuance.hoh$homeless)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(homeless) %>% 
-      summarize(n = n()) %>% 
-      mutate(homeless_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-```
-
-##### Disability
-```{r newadmission_disability_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.newadmission %>%
-  count(member_disability)
-
-# plot levels
-ggplot(df.demog.newadmission, aes(member_disability)) + 
-  geom_bar(fill = 'palevioletred2') +
-  theme_minimal() +
-  labs(x = 'Disability Status', y = 'Count',
-       title = 'Number of Participants with Disabilities') 
-
-# check proportions
-table(df.demog.newadmission$member_disability)
-  tab1 <- table(df.demog.newadmission$member_disability)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission <- df.demog.newadmission %>% 
-  left_join(
-    df.demog.newadmission %>% 
-      group_by(member_disability) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_disability_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission$n <- NULL
-```
-
-Among new admissions, `r round(0.92938931 * 100, digits = 2)` percent do not have a disaibility. A total of `r round(0.07061069 * 100, digits = 2)` percent have a disability.
-
-
-```{r issuance_disability_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.issuance %>%
-  count(member_disability)
-
-# plot levels
-ggplot(df.demog.issuance, aes(member_disability)) + 
-  geom_bar(fill = 'palevioletred2') +
-  theme_minimal() +
-  labs(x = 'Disability Status', y = 'Count',
-       title = 'Number of Participants with Disabilities') 
-
-# check proportions
-table(df.demog.issuance$member_disability)
-  tab1 <- table(df.demog.issuance$member_disability)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance <- df.demog.issuance %>% 
-  left_join(
-    df.demog.issuance %>% 
-      group_by(member_disability) %>% 
-      summarize(n = n()) %>% 
-      mutate(member_disability_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance$n <- NULL
-```
-
-Among issuances of vouchers, `r round(0.93964335 * 100, digits = 2)` percent do not have a disaibility and `r round(0.06035665 * 100, digits = 2)` percent have a disability.
-
-##### Single adult
-A description of households headed by single adults is also of interest to the CMTO study. 
-
-```{r newadmission_hoh_single_adult_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.newadmission.hoh %>%
-  count(single_adult)
-
-# plot levels
-ggplot(df.demog.newadmission.hoh, aes(single_adult)) + 
-  geom_bar(fill = 'purple4') +
-  theme_minimal() +
-  labs(x = 'Single-headed household', y = 'Count',
-       title = 'Number of Households with Single Adults',
-       subtitle = 'New Admissions') 
-
-# check proportions
-table(df.demog.newadmission.hoh$single_adult)
-  tab1 <- table(df.demog.newadmission.hoh$single_adult)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  left_join(
-    df.demog.newadmission.hoh %>% 
-      group_by(single_adult) %>% 
-      summarize(n = n()) %>% 
-      mutate(single_adult_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission.hoh$n <- NULL
-```
-
-Of the `r (41+103)` new admissions, `r round (0.2847222*100, digits = 2)` percent were composed of households with more than one single adult. That is, almost `r round(0.7152778*100, digits =2)` percent of the households are headed by single adults. A similar pattern emerges to describe the sample in which only vouchers were issued.
-
-```{r issuance_hoh_single_adult_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## check levels
-df.demog.issuance.hoh %>%
-  count(single_adult)
-
-# plot levels
-ggplot(df.demog.issuance.hoh, aes(single_adult)) + 
-  geom_bar(fill = 'purple4') +
-  theme_minimal() +
-  labs(x = 'Single-headed households', y = 'Count',
-       title = 'Number of Households with Single Adults',
-       subtitle = 'Issuance of Vouchers') 
-
-# check proportions
-table(df.demog.issuance.hoh$single_adult)
-  tab1 <- table(df.demog.issuance.hoh$single_adult)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(single_adult) %>% 
-      summarize(n = n()) %>% 
-      mutate(single_adult_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-```
-
-```{r newadmission_program_type_vis, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-##### Housing program type
-
-## check levels
-df.demog.newadmission %>%
-  count(program_type)
-  # check levels
-    # levels(df.demog.newadmission$program_type)
-
-# plot levels
-ggplot(df.demog.newadmission, aes(program_type)) + 
-  geom_bar(fill = 'palegreen1') +
-  theme_minimal() +
-  labs(x = 'Housing program type', y = 'Count',
-       title = 'Number of Participants by Housing Program Type') 
-
-# check proportions
-table(df.demog.newadmission$program_type)
-  tab1 <- table(df.demog.newadmission$program_type)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission <- df.demog.newadmission %>% 
-  left_join(
-    df.demog.newadmission %>% 
-      group_by(program_type) %>% 
-      summarize(n = n()) %>% 
-      mutate(program_type_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission$n <- NULL
-```
-
-```{r newadmission_program_subtype_vis, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-##### Housing program subtype
-## check levels
-df.demog.newadmission %>%
-  count(housing_program_subtype)
-  # check levels
-    # levels(df.demog.newadmission$program_type)
-
-# plot levels
-ggplot(df.demog.newadmission, aes(housing_program_subtype)) + 
-  geom_bar(fill = 'pink') +
-  theme_minimal() +
-  labs(x = 'Housing program subtype', y = 'Count',
-       title = 'Number of Participants by Housing Program Subtype') 
-
-# check proportions
-table(df.demog.newadmission$housing_program_subtype)
-  tab1 <- table(df.demog.newadmission$housing_program_subtype)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.newadmission <- df.demog.newadmission %>% 
-  left_join(
-    df.demog.newadmission %>% 
-      group_by(housing_program_subtype) %>% 
-      summarize(n = n()) %>% 
-      mutate(housing_program_subtype_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.newadmission$n <- NULL
-```
-
-##### Certification effective date
-```{r newadmission_hoh_cert_effective_date_vis, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-##### Certification effective date
-## check levels
-#df.demog.newadmission.hoh %>%
-  count(cert_effective_date)
-
-## plot levels
-#ggplot(df.demog.newadmission.hoh, aes(cert_effective_date)) + 
-#  geom_bar(fill = 'darkmagenta') +
-#  theme_minimal() +
-#  labs(x = 'Certification effective date', y = 'Count',
-#       title = 'Number of Households by Certification Effective Date',
-#       subtitle = 'Issuance of Vouchers') 
-
-## check proportions
-#table(df.demog.newadmission.hoh$cert_effective_date)
-#  tab1 <- table(df.demog.newadmission.hoh$cert_effective_date)
-#  prop.table(tab1)
-
-## generate proportion variable
-#df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-#  left_join(
-#    df.demog.newadmission.hoh %>% 
-#      group_by(cert_effective_date) %>% 
-#      summarize(n = n()) %>% 
-#      mutate(cert_effective_date_prop = prop.table(n)) # prop = n / sum(n) works too
-#    )
-#df.demog.newadmission.hoh$n <- NULL
-```
-
-
-```{r issuance_hoh_cert_effective_date_vis, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.issuance.hoh %>%
-  count(cert_effective_date)
-
-#View(df.demog.issuance.hoh)
-
-# plot levels
-ggplot(df.demog.issuance.hoh, aes(cert_effective_date)) + 
-  geom_bar(fill = 'darkmagenta') +
-  theme_minimal() +
-  labs(x = 'Certification effective date', y = 'Count',
-       title = 'Number of Participants by Certification Effective Date',
-       subtitle = 'Issuance of Vouchers') 
-
-# check proportions
-table(df.demog.issuance.hoh$cert_effective_date)
-  tab1 <- table(df.demog.issuance.hoh$cert_effective_date)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(cert_effective_date) %>% 
-      summarize(n = n()) %>% 
-      mutate(cert_effective_date_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-```
-
-
-##### Lease date
-
-The variable `lease date` reflects the date on which a household moved into a new unit.
-
-```{r issuance_hoh_lease_date_vis, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check levels
-df.demog.issuance.hoh %>%
-  count(lease_date)
-
-#View(df.demog.issuance)
-
-# plot levels
-ggplot(df.demog.issuance.hoh, aes(lease_date)) + 
-  geom_bar(fill = 'darkolivegreen1') +
-  theme_minimal() +
-  labs(x = 'Lease date', y = 'Count',
-       title = 'Number of Households by Lease Date',
-       subtitle = 'Issuance of Vouchers') 
-
-# check proportions
-table(df.demog.issuance.hoh$lease_date)
-  tab1 <- table(df.demog.issuance.hoh$lease_date)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance.hoh <- df.demog.issuance.hoh %>% 
-  left_join(
-    df.demog.issuance.hoh %>% 
-      group_by(lease_date) %>% 
-      summarize(n = n()) %>% 
-      mutate(lease_date_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance.hoh$n <- NULL
-```
-
-```{r issuance_hoh_duration_date_vis, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-## generate certification duration variable
-# plot levels
-gg <- ggplot(df.demog.issuance.hoh, aes(x = cert_effective_date, 
-                              xend = lease_date, 
-                              y = factor(race_ethnicity), 
-                              group = factor(entityid))) + 
-  geom_dumbbell(color = '#a3c4dc',
-                size = 0.75, 
-                point.colour.1 = '#0e668b') +
-  scale_x_date() +
-  theme_minimal() +
-  labs(x = NULL, 
-       y = NULL, 
-       title = 'Time between Certification Effective Date and Lease Date', 
-       subtitle = 'Issuance of Vouchers') + 
-  theme(plot.title = element_text(hjust=0.5, face="bold"), 
-        plot.background=element_rect(fill="#f7f7f7"), 
-        panel.background=element_rect(fill="#f7f7f7"), 
-        panel.grid.minor=element_blank(), 
-        panel.grid.major.y=element_blank(), 
-        panel.grid.major.x=element_line(), 
-        axis.ticks=element_blank(), 
-        legend.position="top", 
-        panel.border=element_blank())
-gg
-
-# check proportions
-table(df.demog.issuance$lease_date)
-  tab1 <- table(df.demog.issuance$lease_date)
-  prop.table(tab1)
-
-# generate proportion variable
-df.demog.issuance <- df.demog.issuance %>% 
-  left_join(
-    df.demog.issuance %>% 
-      group_by(lease_date) %>% 
-      summarize(n = n()) %>% 
-      mutate(lease_date_prop = prop.table(n)) # prop = n / sum(n) works too
-    )
-df.demog.issuance$n <- NULL
-```
-
-The dumbbell plot above is a great tool for visualizing relative positions between two points in time. Dumbbell charts also facilitate comparisons in distance between two categories, such as when a voucher was first issued and when a move-in occurs.
-
-In order to get the correct ordering of the dumbbells, the Y variable should be a factor and the levels of the factor variable should be in the same order as it should appear in the plot.
-
-##### Length of housing search
-```{r issuance_hoh_cert_duration}
-# generate duration between certification dates variable
-df.test <- df.demog.issuance.hoh %>%
-   mutate(cert_duration = as.duration(cert_effective_date - lease_date))
-
-# generate average duration between certification
-df.demog.newadmission.hoh <- df.demog.newadmission.hoh %>% 
-  mutate(avg_hh_fam_size_num = mean(hh_fam_size))
-```
 
 ### Covariation
 Bivariate Relationships and Associations
@@ -2115,7 +1090,7 @@ g + geom_density(aes(fill = race_ethnicity), alpha=0.8) +
          fill = "Race-ethnicity")
 ```
 
-Kernel density plots present the probability of an individual occurring within a particular age. This density plot suggests the population of Native Americans and multi-racial individuals in the CMTO sample of new admissions is particularly young. Put differently, the probability that these two ethnoracial groups are represented in children aged 10 is very high. Latinos are overrepresented in the age range between 20 and 30 years. In addition to residents who identified as American Indians, white residents have a high probability of being between the ages of 30 and 40 years. It also appears that the eldest participants among new admissions are Native Hawaiian.
+Kernel density plots present the probability of an individual occurring within a particular age. This density plot suggests the population of Native Americans and multi-racial individuals in the CMTO sample of new admissions is particularly y oung. Put differently, the probability that these two ethnoracial groups are represented in children aged 10 is very high. Latinos are overrepresented in the age range between 20 and 30 years. In addition to residents who identified as American Indians, white residents have a high probability of being between the ages of 30 and 40 years. It also appears that the eldest participants among new admissions are Native Hawaiian.
 
 ```{r issuance_age_num_race_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
 # plot levels
@@ -2223,6 +1198,17 @@ mpg %>%
     facet_grid(drv~.)
     
     
+    
+    
+    ** a. What is the influence of average daily population (ADP) on:
+***  i. encounters
+***  ii. arrests
+*** iii. removals
+
+**a. What is the influence of detention center capacity on:
+***  i. money deposit
+***  ii. cash bail
+    
     Enforcement index by Area of Responsibility (AOR):
 Total base capacity for detention centers
 Total number of “as needed” centers
@@ -2236,3 +1222,9 @@ Additional variables:
 Border
 Southern border (1,0)
 Northern border (1,0)
+
+I often hear concern about the non-normal distributions of independent variables in regression models, and I am here to ease your mind.
+
+There are NO assumptions in any linear model about the distribution of the independent variables.  Yes, you only get meaningful parameter estimates from nominal (unordered categories) or numerical (continuous or discrete) independent variables.  But no, the model makes no assumptions about them.  They do not need to be normally distributed or continuous.
+
+It is useful, however, to understand the distribution of predictor variables to find influential outliers or concentrated values.  A highly skewed independent variable may be made more symmetric with a transformation.
