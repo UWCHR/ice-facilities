@@ -2179,7 +2179,7 @@ Here we look at estimating and visualizing how two numerical variables are posit
 
 We will focus on the average annual growth rate of real GDP from 1960-1995 and the average number of years of schooling for adult residents in the country in 1960.
 
-```{r estimate_correlation_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+```{r estimate_correlation_adp_enforcement, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # compute the pearson correlation coefficient
   # adp and arrests: linear-linear
   df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_arrests)) %>% pull(r)
@@ -2267,53 +2267,55 @@ cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)),
 cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
          y = (log(df_aor_adp_enforcement_long_complete$n_encounters)), 
          alternative="two.sided", conf.level=0.95, method='pearson') 
-    # p-value = 7.901e-05
+    # p-value = 0.00007901
 
 
 # adp and removals
   cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
            y = df_aor_adp_enforcement_long_complete$n_removals, 
            alternative="two.sided", conf.level=0.95, method='pearson')
-    #  p-value < 2.2e-16
+    #  p-value < 0.00000000000000022
 
 # log-log transformation
 cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
          y = (log(df_aor_adp_enforcement_long_complete$n_removals)), 
          alternative="two.sided", conf.level=0.95, method='pearson') 
-    # p-value < 2.2e-16
+    # p-value < 0.00000000000000022
 ```
 
-The p-value for the hypothesis test is 0.0000001679, which is far below a common significance level of 0.05. With a high degree of confidence we can state we have found sufficient statistical evidence that the average years of schooling is correlated subsequent real GDP growth. The 95% confidence interval is also included in the output to cor.test. The results reveal an interval estimate for the population Pearson correlation coefficient between 0.095 and 0.53. With 95% confidence, this interval contains the true population Pearson correlation coefficient. This range includes all positive numbers, but ranges from somewhat weak but positive correlation to strong positive correlation.
+The p-values for these hypothesis test are far below a common significance level of 0.05. With a high degree of confidence we can state we have found sufficient statistical evidence that the average daily popuation is correlated with various outcomes of interior immigration enforcement. The 95 percent confidence interval is also included in the output to cor.test. The results reveal an interval estimate for the population Pearson correlation coefficient between 0.095 and 0.53. With 95 percent confidence, this interval contains the true population Pearson correlation coefficient. This range includes all positive numbers, but ranges from somewhat weak but positive correlation to strong positive correlation.
 
-Patterns in your data provide clues about relationships. If a systematic relationship exists between two variables it will appear as a pattern in the data. If you spot a pattern, ask yourself:
+Patterns in the data provide clues about relationships. If a systematic relationship exists between two variables it will appear as a pattern in the data:
 
-* Could this pattern be due to coincidence (i.e. random chance)?
+* Could this pattern be due to coincidence (i.e., random chance)?
 * How can you describe the relationship implied by the pattern?
 * How strong is the relationship implied by the pattern?
 * What other variables might affect the relationship?
 * Does the relationship change if you look at individual subgroups of the data?
 
-The visualization of choice when exploring the relationship between two variables, such as average daily population and arrests, is a scatterplot. Let us first create a scatterplot that illustrates the relationship between average daily population and the number of arrests.
+The visualization of choice when exploring the relationship between two continuous variables, such as average daily population and arrests, is a scatterplot. Let us first create a scatterplot that illustrates the relationship between average daily population and the number of arrests.
 
 ### Visualize bivariate relationship 
 A scatterplot of average daily population (ADP) versus the number of arrests shows a pattern: more arrests are associated with larger average daily populations.
 
-```{r scatterplot_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+```{r scatterplot_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # plot adp and arrests
 plot_adp_arrests <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_arrests)) + 
-  geom_point(alpha = 0.5)
+  geom_point(alpha = 0.5) +
+  labs(x="Average Daily Population", y="Number of Arrests"))
+
   
   plot_adp_arrests
   
   (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_arrests)) +
       geom_point(alpha = 0.5) + 
       geom_smooth(method="lm") + 
-      labs(x="ADP", y="Arrests"))
+  labs(x="Average Daily Population", y="Number of Arrests"))
   
   (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_arrests)) +
       geom_point(alpha = 0.5) + 
       geom_smooth(method="lm") + 
-      labs(x="ADP", y="Arrests") + 
+  labs(x="Average Daily Population", y="Number of Arrests") +
       facet_wrap( ~ aor))
 
 # plot log adp and log arrests
@@ -2354,7 +2356,7 @@ plot_adp_encounters <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y
       facet_wrap( ~ aor))
 
 # plot log adp and log encounters
-plot_log_adp_arrests <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_encounters))) + 
+plot_log_adp_encounters <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_encounters))) + 
   geom_point(alpha = 0.5)  
 
   plot_log_adp_encounters
@@ -2408,19 +2410,6 @@ plot_log_adp_removals <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(
       facet_wrap( ~ aor))
 ```
 
-
-#### Visualize bivariate time series
-How does ADP and number of arrests vary across time?
-
-```{r visualize_bivariate_time_series, eval=FALSE}
-#https://clanfear.github.io/CSSS508/Lectures/Week2/CSSS508_Week2_ggplot2.html#98
-
-ggplot(df_aor_adp_enforcement_long_complete, aes(x = fiscal_year, y = ..count.., group = aor)) + 
-  geom_line(aes(y = n_arrests, color = "n_arrests")) + 
-  geom_line(aes(y = adp, color = "adp")) +
-  theme_bw() + 
-  facet_wrap(~ aor) 
-```
 
 You can see a strong pattern in the data. Let’s use a model to capture that pattern and make it explicit. It’s our job to supply the basic form of the model. In this case, the relationship looks linear, i.e. y = a_0 + a_1 * x. There’s one more approach that we can use for this model, because it’s a special case of a broader family: linear models. A linear model has the general form y = a_1 + a_2 * x_1 + a_3 * x_2 + ... + a_n * x_(n - 1). So this simple model is equivalent to a general linear model where n is 2 and x_1 is x. R has a tool specifically designed for fitting linear models called lm(). lm() has a special way to specify the model family: formulas. Formulas look like y ~ x, which lm() will translate to a function like y = a_1 + a_2 * x. We can fit the model and look at the output:
 
@@ -2477,7 +2466,7 @@ where β0,β1  and  β2  are three parameters to estimate. To take a look at the
 
 ```{r }
 #https://moderndive.com/5-regression.html
-df_aor_adp_arrests_long %>% 
+df_aor_adp_enforcement_long_complete %>% 
   get_correlation(log(n_arrests) ~ log(adp))
 
 ```
@@ -2485,7 +2474,7 @@ df_aor_adp_arrests_long %>%
 ```{r }
 # https://b-rodrigues.github.io/modern_R/statistical-models.html#fitting-a-model-to-data
 
-model1 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_arrests_long)
+model1 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_enforcement_long_complete)
 
 
 summary(model1)
@@ -2510,7 +2499,7 @@ ggplot(aor_aug) +
 
 fit1 <- fitted(model1)
 
-total_pos <- housing_aug %>%
+total_pos <- aor_aug %>%
   filter(.resid > 0) %>%
   summarise(total = n()) %>%
   pull(total)
@@ -2530,10 +2519,10 @@ ggplot(data = effects_model1) +
   theme(axis.text.x = element_text(angle = 45))
 
 
-ggplot(df_aor_adp_arrests_long) +
+ggplot(df_aor_adp_enforcement_long_complete) +
   geom_density(aes(n_arrests))
 
-model_log <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_arrests_long)
+model_log <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_enforcement_long_complete)
 
 result_log <- broom::tidy(model_log)
 
@@ -2557,10 +2546,10 @@ To visualise the predictions from a model, we start by generating an evenly spac
 
 ```{r }
 #https://r4ds.had.co.nz/model-building.html#introduction-16
-ggplot(df_aor_adp_arrests_long, aes(adp, n_arrests)) + 
+ggplot(df_aor_adp_enforcement_long_complete, aes(adp, n_arrests)) + 
   geom_hex(bins = 50)
 
-newdf <- df_aor_adp_arrests_long %>% 
+newdf <- df_aor_adp_enforcement_long_complete %>% 
   mutate(ladp = log(adp), larrests = log(n_arrests))
 
 ggplot(newdf, aes(ladp, larrests)) + 
@@ -2719,7 +2708,7 @@ Approach #2: Marginal Multilevel Model
 Approach #3: Linear Mixed Model
 
 
-# Statistical models
+## Statistical models
 Statistical models attempt to summarize relationships between variables by reducing the dimensionality of the data.
 
 
