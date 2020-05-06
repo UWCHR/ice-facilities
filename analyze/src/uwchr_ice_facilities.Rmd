@@ -1,28 +1,22 @@
 ---
-title: "Exploratory Data Analysis (EDA) of Immigration and Customs Enforcement (ICE) Detention Facilities, 2016--2019"
-subtitle: "Freedom of Information Act (FOIA) Request Records"
+title: "Exploratory Data Analysis (EDA) of Interior Immigration Detention and Enforcement Dynamics"
+subtitle: "Freedom of Information Act (FOIA) Request Records of U.S. Immigration and Customs Enforcement (ICE) Detention Facilities, Encounters, Arrests, and Removals"
 author: Thiago Marques
 -institute: University of Washington Center for Human Rights
 date: "January 6, 2020"
-output:
-  word_document: default
-  pdf_document: default
+output: html_document
 ---
 
 # Introduction
-Interior immigration enforcement is receiving increased attention from researchers in collaboration with activists and advocacy groups. The University of Washington Center for Human Rights answers the following research questions in partnership with such local social movements. The research questions in this project describe and explain the following associations:
+This .Rmd file performs data wrangling tasks and exploratory analyses of administrative records on detention facilities spanning the years 2009-2018 and interior immigration enforcement practices such as encounters, arrests, and removals between 2015-2019. The central research question is: To what extent does changing detention capacity drive changing enforcement practices?
 
-* 1. What is the influence of detention center capacity on immigration law enforcement practices?
-* 2. What is the influence of detention center capacity on immigration bail bonds?
+# Import data
+First, I must import my data, which are typically stored in a file, database, or web API, and load it into a data frame with the `R` programming language and software environment for statistical computing and graphics.
 
+## Initialize environment
+I clear the working memory, check current library paths, and load user-created packages.
 
-This .Rmd file performs data wrangling tasks and exploratory analyses of administrative records on detention facilities spanning the years 2016--2019. Data were obtained from the United States Department of Homeland Security (DHS) federal law enforcement agency, US Immigration and Customs Enforcement (ICE) via Freedom of Information Act (FOIA) requests submitted by the University of Washington Center for Human Rights.
- 
-# Data wrangling
-I first clear the working memory, load user-created packages, and import data with the `R` programming language and software environment for statistical computing and graphics. I tidy these data to then facilitate their transformation and visualization. 
-
-## Initiate environment
-```{r install_packages, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+```{r install_packages, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # clear memory
 rm(list=ls())
 
@@ -34,6 +28,9 @@ rm(list=ls())
 library(pander) # creates tables
 library(tidyverse) # easily install and load the 'Tidyverse' set of packages
 library(tidycensus)
+library(tigris)
+library(sf)
+library(mapview)
 library(ipumsr)
 library(shiny)
 library(DT)
@@ -43,73 +40,701 @@ library(lavaan)
 library(forcats)
 library(lubridate)
 library(modelr)
+library(corrr)
+library(skimr)
+library(broom)
+library(ggfortify)
+library(margins)
+library(moderndive)
 ```
 
-Next, I will read three different data frames into `R`. The first data frame contains facility-level information on average daily population, X, Y, and Z. The second data frame contains individual-level arrest records. These data come from the U.S. Immigration and Customs Enforcement (ICE) agency responsible for interior immigration enforcement, and is  documented in SOURCE. Derived from the US Census Bureau American Community Survey (ACS), the third data frame comprises information on economic, social, and demographic characteristics of counties. 
+## Read data
+I read three different data frames into `R`. Two sources of data come from the U.S. Immigration and Customs Enforcement (ICE) agency responsible for interior immigration enforcement, and are documented in the authorized facility notes of its Enforcement and Removal Operations (ERO) Custody Management Division.
 
-## Import data
-```{r read_data, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+The first data frame contains facility-level information on the estimated bed space available for use by ICE (i.e., capacity) and the average daily population (ADP). The second data frame contains incident-level records of encounters, arrests, and removals. 
+
+The third data frame contains county-level demographic, social, and economic characteristics, derived from the decennial census as well as the American Community Survey (ACS) produced by the Bureau of the Census.
+
+```{r read_data, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # check working directory
-getwd() # "C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academic/Graduate School/University of Washington/Research/Projects/ICE"
+getwd() # "C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academics/Graduate School/University of Washington/Research/Projects/ICE"
 
 # set working directory
-setwd("C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academic/Graduate School/University of Washington/Research/Projects/ICE")
+setwd("C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academics/Graduate School/University of Washington/Research/Projects/ICE")
 
 # load foia-ice rectangular data
   # read facilities data
   df_facilities <- ice_facilities_data <- read_delim(
     "C:/Users/marqu/git/ice-facilities/analyze/input/facil-list.csv.gz", 
     delim = "|") 
-                    
+          
+  # read encounters data
+    df_encounters <- ice_encounters_data <- 
+      read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/encounters.csv.gz", 
+                 delim = "|")
+    
   # read arrests data
   df_arrests <- ice_arrests_data <- 
       read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/arrests.csv.gz", 
                  delim = "|")
-    
-    
-# load (tidy)census decennial and inter-decennial rectangular data
-    #vt <- get_decennial(
-#  geography,
-#  year = 2010,
-#  geometry = 
-#
-#
-# = "county", 
-#             variables = c(medincome = "B19013_001"), 
-#             state = "VT",
-# year =
+  
+  # read removals data
+  df_removals <- ice_removals_data <- 
+      read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/removals.csv.gz", 
+                 delim = "|")
+  
+# # load mpi arrests data
+#   df_mpi_arrests <- mpi_arrests_data <- 
+#     read_delim("C:/Users/marqu/git/ice-facilities/analyze/hand/mpi_arrest_table_copy.csv", 
+#                delim = "|")
 ```
 
-```{r structure, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
-# check number of rows and columns
-nrow(df_facilities)
-ncol(df_facilities)
+```{r inspect_structure, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
+# inspect facility-level data frame
+  # check number of rows and columns
+  nrow(df_facilities)
+  ncol(df_facilities)
+  
+  # check structure of data
+  str(df_facilities) # no factor variables
+  glimpse(df_facilities)
+  
+  # check beginning and end of data
+  head(df_facilities[, c(6:7, 10)])
+  tail(df_facilities[, c(6:7, 10)])
+  
+  # check variable names
+  names(df_facilities)
+  
+  # standardize variable names
+  #names(df_facilities) <- tolower(names(df_facilities))
+  #names(df_facilities)
 
-# check structure of data
-str(df_facilities) # no factor variables
-glimpse(df_facilities)
+# inspect arrest-level data frame
+  # check number of rows and columns
+  nrow(df_arrests)
+  ncol(df_arrests)
+  
+  # check structure of data
+  str(df_arrests) # no factor variables
+  glimpse(df_arrests)
+  
+  # check beginning and end of data
+  head(df_arrests[, c(6:7, 9)])
+  tail(df_arrests[, c(6:7, 9)])
+  
+  # check variable names
+  names(df_arrests)
+  
+# inspect encounter-level data frame
+  # check number of rows and columns
+  nrow(df_encounters)
+  ncol(df_encounters)
+  
+  # check structure of data
+  str(df_encounters) # no factor variables
+  glimpse(df_encounters)
+  
+  # check beginning and end of data
+  head(df_encounters[, c(6:7, 8)])
+  tail(df_encounters[, c(6:7, 8)])
+  
+  # check variable names
+  names(df_encounters)
+  
+# inspect removal-level data frame
+  # check number of rows and columns
+  nrow(df_removals)
+  ncol(df_removals)
+  
+  # check structure of data
+  str(df_removals) # no factor variables
+  glimpse(df_removals)
+  
+  # check beginning and end of data
+  head(df_removals[, c(6:7, 10)])
+  tail(df_removals[, c(6:7, 10)])
+  
+  # check variable names
+  names(df_removals)
+```
 
-# check beginning and end of data
-head(df_facilities[, c(6:7, 10)])
-tail(df_facilities[, c(6:7, 10)])
+I am finished collecting the data relevant to the problem.
 
-# check variable names
-names(df_facilities)
+# Wrangle data
+Now I will get my data in a form that is natural to work with. Together, tidying and transforming are called wrangling. 
 
-# standardize variable names
-#names(df_facilities) <- tolower(names(df_facilities))
-#names(df_facilities)
+## Tidy data
+Now that I have imported my data, it is a good idea to tidy it. Tidying your data means storing it in a consistent form that matches the semantics of the dataset with the way it is stored. In brief, when your data is tidy, each column is a variable, and each row is an observation. Tidy data is important because the consistent structure lets you focus your struggle on questions about the data, not fighting to get the data into the right form for different functions.
+
+#### Pivot facilities wide to long
+```{r pivot_facilities_wide_to_long, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# pivot facilities wide to long
+
+## RETURN HERE WHEN VARLIST IS DECIDED (i.e., import -> tidy -> transform)
+## DOWNSCROLL FOR TIDY DATA (AFTER TRANSFORM DATA)
 
 ```
 
-## Data transformation
-I will solve the vast majority of my data manipulation challenges in this section. Here, I will recode my variables of interest. It is important to note that I will be replacing the unusual values (i.e, not in universe, unknown) with missing values (i.e., NA in R).
+## Transform data
+Once you have tidy data, a common first step is to transform it. Transformation includes narrowing in on observations of interest (e.g., all people in one city, all data from the last year), creating new variables that are functions of existing variables (e.g., computing speed from distance and time), and calculating a set of summary statistics (e.g., counts, means). 
+
+I will solve the vast majority of my data manipulation challenges in this section. It is important to note that I will be recoding my variables of interest by replacing the unusual values (i.e., not in universe, unknown) with missing values (i.e., NA in `R`).
 
 ### Select variables
-#### Detention location
-Detention facilities are uniquely identified by a code (`detloc`). Other geographic variables include facility name, street address, city, county, state, and ZIP code. Facilities are also located within an area of responsibility (AOR).
+I am selecting variables from datasets on county-level demographic, economic, and social information. These data come from the United States Census Bureau (USCB). I am also selecting variables from two datasets collected from ICE. A facility-level dataset reveals bed levels and average daily population (ADP) between 2009-2018. The second data frame contains event-level data on encounters, arrests, and removals for 2015-2019.
 
-```{r detloc, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+#### Data on counties
+County-level data are useful because they could enable us to control for important confounding variables. However, we need to map these counties onto AORs. The geographic range of an AOR varies dramatically. For example, the states of California, New York, and Texas have more than one AOR within them, while other AORs are either complete states (e.g., the Phoenix AOR is the state of AZ), or composites of several states (e.g., Seattle AOR is WA, OR and AK). 
+
+ICE does not provide information on which counties are included within each AOR. Census boundary shapefiles are useful for disaggregating AORs down to the level of the county.
+
+```{r check_boundary_shapefiles, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+
+# check census api key
+Sys.getenv("CENSUS_API_KEY")
+
+# use tigris
+options(tigris_use_cache = TRUE)
+# load county boundary shapefiles
+  # texas
+  tx <- counties("TX", year = 2018, class = "sf")
+  
+    # plot 
+    ggplot(tx) + 
+        geom_sf(fill = "transparent") + 
+      geom_sf_text(aes(label = GEOID), size = 1) + 
+          theme_void()
+    
+    ggsave("tx_counties.pdf")
+  
+  # california
+    ca <- counties("CA", year = 2018, class = "sf")
+    
+    # plot 
+    ggplot(ca) + 
+        geom_sf(fill = "transparent") + 
+      geom_sf_text(aes(label = GEOID), size = 1) + 
+          theme_void()
+    
+    ggsave("ca_counties.pdf")
+  
+  # new york
+    ny <- counties("NY", year = 2018, class = "sf")
+    
+    # plot 
+    ggplot(ny) + 
+        geom_sf(fill = "transparent") + 
+      geom_sf_text(aes(label = GEOID), size = 1) + 
+          theme_void()
+    
+    ggsave("ny_counties.pdf")
+```
+
+I assign each county (i.e., GEOID) to an AOR and export a `.csv` file containing this data table.
+
+```{r assign_counties_to_aors, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+
+# download the variable dictionary
+  var2018_acs5 <- load_variables(2018, "acs5", cache = TRUE)
+  #View(var2018_acs5)
+
+# return data frame of geographical unit identifier and descriptive name
+df_counties <- get_acs(
+  geography = "county", 
+  variables = c("Total Population" = "B01003_001"),
+  year = 2018,
+  survey = "acs5") %>%
+  select(c("GEOID", "NAME")) # keep county geoid and name
+
+  # standardize variable names
+  names(df_counties) <- tolower(names(df_counties))
+  
+  # separate geoid into state and county identifiers
+df_counties <- df_counties %>%
+  separate(geoid, 
+           c("geoid_state", 
+             "geoid_county"), 
+           sep = 2,
+           remove = FALSE
+           )
+
+# generate variable indicating aor
+df_counties <- df_counties %>%
+  mutate(aor = "")
+  # assign states to aors
+df_counties <- mutate(df_counties, aor = 
+    # assign states to aors
+        ifelse(geoid_state %in% c("13", "37", "45"), "ATL",
+        ifelse(geoid_state %in% c("24"), "BAL", 
+        ifelse(geoid_state %in% c("09", "23", "25", "33", "44", "50"), "BOS", 
+        ifelse(geoid_state %in% c("17", "18", "55", "29", "21", "20"), "CHI", 
+        ifelse(geoid_state %in% c("08", "56"), "DEN", 
+        ifelse(geoid_state %in% c("26", "39"), "DET", 
+        ifelse(geoid_state %in% c("35"), "ELP", 
+        ifelse(geoid_state %in% c("12", "72", "78"), "MIA", 
+        ifelse(geoid_state %in% c("34"), "NEW", 
+        ifelse(geoid_state %in% c("01", "05", "22", "28", "47"), "NOL", 
+        ifelse(geoid_state %in% c("10", "42", "54"), "PHI", 
+        ifelse(geoid_state %in% c("04"), "PHO", 
+        ifelse(geoid_state %in% c("02", "41", "53"), "SEA", 
+        ifelse(geoid_state %in% c("15", "14"), "SFR", # missing Saipan
+        ifelse(geoid_state %in% c("49", "16", "30", "32"), "SLC", 
+        ifelse(geoid_state %in% c("19", "27", "31", "38", "46"), "SPM", 
+        ifelse(geoid_state %in% c("11", "51"), "WAS", 
+        ifelse(geoid_state %in% c("40"), "DAL", 
+    # assign counties to aors
+        ifelse(geoid %in% c("36001", "36003", "36007", "36009", "36011", "36013", "36015", "36017", "36019", "36021", "36023", "36025", "36029", "36031", "36033", "36035", "36037", "36039", "36041", "36043", "36045", "36049", "36051", "36053", "36055", "36057", "36063", "36065", "36067", "36069", "36073", "36075", "36077", "36083", "36091", "36093", "36095", "36097", "36099", "36089", "36101", "36107", "36109", "36113", "36115", "36117", "36121", "36123"), "BUF", 
+        ifelse(geoid %in% c(
+"48001", # Anderson County, Texas
+"48387", 	# Red River County, Texas
+"48073", 	# Cherokee County, Texas
+"48349", 	# Navarro County, Texas
+"48213", 	# Henderson County, Texas
+"48105", 	# Crockett County, Texas
+"48435", 	# Sutton County, Texas
+"48077", 	# Clay County, Texas
+"48009", 	# Archer County, Texas
+"48011", 	# Armstrong County, Texas
+"48017", 	# Bailey County, Texas
+"48023", 	# Baylor County, Texas
+"48111", 	# Dallam County, Texas
+"48117", 	# Deaf Smith County, Texas
+"48165", 	# Gaines County, Texas
+"48115", 	# Dawson County, Texas
+"48095", 	# Concho County, Texas
+"48327", 	# Menard County, Texas
+"48413", 	# Schleicher County, Texas
+"48451", 	# Tom Green County, Texas
+"48235", 	# Irion County, Texas
+"48383", 	# Reagan County, Texas
+"48431", 	# Sterling County, Texas
+"48173", 	# Glasscock County, Texas
+"48081", 	# Coke County, Texas
+"48227", 	# Howard County, Texas
+"48295", 	# Lipscomb County, Texas
+"48357", 	# Ochiltree County, Texas
+"48195", 	# Hansford County, Texas
+"48421", 	# Sherman County, Texas
+"48211", 	# Hemphill County, Texas
+"48393", 	# Roberts County, Texas
+"48233", 	# Hutchinson County, Texas
+"48341", 	# Moore County, Texas
+"48205", 	# Hartley County, Texas
+"48445", 	# Terry County, Texas
+"48497", 	# Wise County, Texas
+"48503", 	# Young County, Texas
+"48501", 	# Yoakum County, Texas
+"48499", 	# Wood County, Texas
+"48437", 	# Swisher County, Texas
+"48485", 	# Wichita County, Texas
+"48449", 	# Titus County, Texas
+"48433", 	# Stonewall County, Texas
+"48333", 	# Mills County, Texas
+"48033", 	# Borden County, Texas
+"48037", 	# Bowie County, Texas
+"48045", 	# Briscoe County, Texas
+"48049", 	# Brown County, Texas
+"48059", 	# Callahan County, Texas
+"48063", 	# Camp County, Texas
+"48065", 	# Carson County, Texas
+"48067", 	# Cass County, Texas
+"48223", 	# Hopkins County, Texas
+"48069", 	# Castro County, Texas
+"48075", 	# Childress County, Texas
+"48359", 	# Oldham County, Texas
+"48079", 	# Cochran County, Texas
+"48083", 	# Coleman County, Texas
+"48085", 	# Collin County, Texas
+"48087", 	# Collingsworth County, Texas
+"48093", 	# Comanche County, Texas
+"48097", 	# Cooke County, Texas
+"48101", 	# Cottle County, Texas
+"48107", 	# Crosby County, Texas
+"48113", 	# Dallas County, Texas
+"48119", 	# Delta County, Texas
+"48159", 	# Franklin County, Texas
+"48121", 	# Denton County, Texas
+"48125", 	# Dickens County, Texas
+"48129", 	# Donley County, Texas
+"48487", 	# Wilbarger County, Texas
+"48139", 	# Ellis County, Texas
+"48143", 	# Erath County, Texas
+"48147", 	# Fannin County, Texas
+"48151", 	# Fisher County, Texas
+"48153", 	# Floyd County, Texas
+"48155", 	# Foard County, Texas
+"48169",  # Garza County, Texas
+"48483", 	# Wheeler County, Texas
+"48467", 	# Van Zandt County, Texas
+"48459", 	# Upshur County, Texas
+"48179", 	# Gray County, Texas
+"48181", 	# Grayson County, Texas
+"48429", 	# Stephens County, Texas
+"48439", 	# Tarrant County, Texas
+"48441", 	# Taylor County, Texas
+"48447", 	# Throckmorton County, Texas
+"48183", 	# Gregg County, Texas
+"48353", 	# Nolan County, Texas
+"48189", 	# Hale County, Texas
+"48191", 	# Hall County, Texas
+"48197", 	# Hardeman County, Texas
+"48423", 	# Smith County, Texas
+"48231", 	# Hunt County, Texas
+"48203", 	# Harrison County, Texas
+"48207", 	# Haskell County, Texas
+"48219", 	# Hockley County, Texas
+"48221", 	# Hood County, Texas
+"48237", 	# Jack County, Texas
+"48251", 	# Johnson County, Texas
+"48253", 	# Jones County, Texas
+"48257", 	# Kaufman County, Texas
+"48263", 	# Kent County, Texas
+"48415", 	# Scurry County, Texas
+"48417", 	# Shackelford County, Texas
+"48401", 	# Rusk County, Texas
+"48399", 	# Runnels County, Texas
+"48397", 	# Rockwall County, Texas
+"48375", 	# Potter County, Texas
+"48379", 	# Rains County, Texas
+"48381", 	# Randall County, Texas
+"48269", 	# King County, Texas
+"48275", 	# Knox County, Texas
+"48277", 	# Lamar County, Texas
+"48279", 	# Lamb County, Texas
+"48303", 	# Lubbock County, Texas
+"48305", 	# Lynn County, Texas
+"48315", 	# Marion County, Texas
+"48335",  # Mitchell County, Texas
+"48337", 	# Montague County, Texas
+"48343", 	# Morris County, Texas
+"48345", 	# Motley County, Texas
+"48363", 	# Palo Pinto County, Texas
+"48365", 	# Panola County, Texas
+"48367", 	# Parker County, Texas
+"48369"), 	# Parmer County, Texas 
+"DAL", 
+        ifelse(geoid %in% c(
+"48141", 	# El Paso County, Texas
+"48003", 	# Andrews County, Texas
+"48317", 	# Martin County, Texas
+"48229", 	# Hudspeth County, Texas
+"48377", 	# Presidio County, Texas
+"48243", 	# Jeff Davis County, Texas
+"48109", 	# Culberson County, Texas
+"48389", 	# Reeves County, Texas
+"48371", 	# Pecos County, Texas
+"48043", 	# Brewster County, Texas
+"48443", 	# Terrell County, Texas
+"48301", 	# Loving County, Texas
+"48495", 	# Winkler County, Texas
+"48135", 	# Ector County, Texas
+"48329", 	# Midland County, Texas
+"48475", 	# Ward County, Texas
+"48103", 	# Crane County, Texas
+"48461", 	# Upton County, Texas
+"48133"), # Eastland County, Texas), 
+"ELP", 
+        ifelse(geoid %in% c(
+"48005", 	# Angelina County, Texas
+"48007", 	# Aransas County, Texas
+"48457", 	# Tyler County, Texas
+"48015", 	# Austin County, Texas
+"48025", 	# Bee County, Texas
+"48391", 	# Refugio County, Texas
+"48339", 	# Montgomery County, Texas
+"48039", 	# Brazoria County, Texas
+"48041", 	# Brazos County, Texas
+"48051", 	# Burleson County, Texas
+"48047", 	# Brooks County, Texas
+"48261", 	# Kenedy County, Texas
+"48057", 	# Calhoun County, Texas
+"48071", 	# Chambers County, Texas
+"48089", 	# Colorado County, Texas
+"48167", 	# Galveston County, Texas
+"48123", 	# DeWitt County, Texas
+"48149", 	# Fayette County, Texas
+"48157", 	# Fort Bend County, Texas
+"48473", 	# Waller County, Texas
+"48477", 	# Washington County, Texas
+"48481", 	# Wharton County, Texas
+"48469", 	# Victoria County, Texas
+"48471", 	# Walker County, Texas
+"48175", 	# Goliad County, Texas
+"48455", 	# Trinity County, Texas
+"48185", 	# Grimes County, Texas
+"48199", 	# Hardin County, Texas
+"48419", 	# Shelby County, Texas
+"48287", 	# Lee County, Texas
+"48201", 	# Harris County, Texas
+"48361", 	# Orange County, Texas
+"48225", 	# Houston County, Texas
+"48239", 	# Jackson County, Texas
+"48241", 	# Jasper County, Texas
+"48245", 	# Jefferson County, Texas
+"48249", 	# Jim Wells County, Texas
+"48395", 	# Robertson County, Texas
+"48403", 	# Sabine County, Texas
+"48405", 	# San Augustine County, Texas
+"48407", 	# San Jacinto County, Texas
+"48409", 	# San Patricio County, Texas
+"48273", 	# Kleberg County, Texas
+"48285", 	# Lavaca County, Texas
+"48289", 	# Leon County, Texas
+"48291", 	# Liberty County, Texas
+"48297", 	# Live Oak County, Texas
+"48313", 	# Madison County, Texas
+"48321", 	# Matagorda County, Texas
+"48331", 	# Milam County, Texas
+"48347", 	# Nacogdoches County, Texas
+"48351", 	# Newton County, Texas
+"48355", 	# Nueces County, Texas
+"48373"), 	# Polk County, Texas 
+"HOU", 
+        ifelse(geoid %in% c(
+"48307", 	# McCulloch County, Texas
+"48507", 	# Zavala County, Texas 
+"48505", 	# Zapata County, Texas
+"48013", 	# Atascosa County, Texas
+"48019", 	# Bandera County, Texas
+"48491", 	# Williamson County, Texas
+"48021", 	# Bastrop County, Texas
+"48027", 	# Bell County, Texas
+"48453", 	# Travis County, Texas
+"48029", 	# Bexar County, Texas
+"48031", 	# Blanco County, Texas
+"48035", 	# Bosque County, Texas
+"48489", 	# Willacy County, Texas
+"48061", 	# Cameron County, Texas
+"48215", 	# Hidalgo County, Texas
+"48427", 	# Starr County, Texas
+"48247", 	# Jim Hogg County, Texas
+"48479", 	# Webb County, Texas
+"48053", 	# Burnet County, Texas
+"48055", 	# Caldwell County, Texas
+"48267", 	# Kimble County, Texas
+"48493", 	# Wilson County, Texas
+"48091", 	# Comal County, Texas
+"48099", 	# Coryell County, Texas
+"48127", 	# Dimmit County, Texas
+"48131", 	# Duval County, Texas
+"48137", 	# Edwards County, Texas
+"48145", 	# Falls County, Texas
+"48161", 	# Freestone County, Texas
+"48163", 	# Frio County, Texas
+"48463", 	# #Uvalde County, Texas
+"48465", 	# Val Verde County, Texas
+"48171", 	# Gillespie County, Texas
+"48177", 	# Gonzales County, Texas
+"48187", 	# Guadalupe County, Texas
+"48425", 	# Somervell County, Texas
+"48209", 	# Hays County, Texas
+"48217", 	# Hill County, Texas
+"48193", 	# Hamilton County, Texas
+"48271", 	# Kinney County, Texas
+"48255", 	# Karnes County, Texas
+"48259", 	# Kendall County, Texas
+"48265", 	# Kerr County, Texas
+"48411", 	# San Saba County, Texas
+"48385", 	# Real County, Texas
+"48283", 	# La Salle County, Texas
+"48281", 	# Lampasas County, Texas
+"48293", 	# Limestone County, Texas
+"48299", 	# Llano County, Texas
+"48319", 	# Mason County, Texas
+"48323", 	# Maverick County, Texas
+"48309", 	# McLennan County, Texas
+"48311", 	# McMullen County, Texas
+"48325"), 	# Medina County, Texas
+"SNA", 
+        ifelse(geoid %in% c("06079", "06083", "06111", "06037", "06059", "06065", "06071"), "LOS", 
+        ifelse(geoid %in% c("36005", "36061", "36081", "36047", "36085", "36027", "36059", "36079", "36103", "36105", "36071", "36087", "36111", "36119"), "NYC", 
+        ifelse(geoid %in% c("06029", "06015", "06093", "06049", "06023", "06105", "06089", "06035", "06103", "06063", "06045", "06021", "06033", "06011", "06007", "06115", "06057", "06091", "06097", "06055", "06041", "06101", "06113", "06095", "06067", "06061", "06017", "06005", "06009", "06003", "06109", "06051", "06075", "06013", "06001", "06077", "06099", "06043", "06081", "06085", "06047", "06039", "06087", "06053", "06069", "06019", "06031", "06107", "06027"), "SFR", 
+        ifelse(geoid %in% c("06073", "06025"), "SND", "Fail"))))))))))))))))))))))))))))
+
+View(df_counties)
+
+# REPRODUCE ICE MAP OF THE US DIVIDED INTO AORS
+```
+
+```{r export_counties_table, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# export table of counties as .csv file
+write_csv(df_counties, path = "C:/Users/marqu/git/ice-facilities/analyze/src/df_county_aor.csv")
+```
+
+In order to determine which variables to select, I first download the variable dictionary.
+
+```{r download_variable_dictionary, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+
+# download the variable dictionary
+  #var2009_acs5 <- load_variables(2009, "acs5", cache = TRUE)
+  #var2009_acs1 <- load_variables(2009, "acs1", cache = TRUE)
+  var2010_acs1 <- load_variables(2010, "acs1", cache = TRUE)
+  var2011_acs1 <- load_variables(2011, "acs1", cache = TRUE)
+  var2012_acs1 <- load_variables(2012, "acs1", cache = TRUE)
+  var2013_acs1 <- load_variables(2013, "acs1", cache = TRUE)
+  var2014_acs1 <- load_variables(2014, "acs1", cache = TRUE)
+  var2015_acs1 <- load_variables(2015, "acs1", cache = TRUE)
+  var2016_acs1 <- load_variables(2016, "acs1", cache = TRUE)
+  var2017_acs1 <- load_variables(2017, "acs1", cache = TRUE)
+  var2018_acs1 <- load_variables(2018, "acs1", cache = TRUE)
+```
+
+The literature highlights several measures of demographic, economic, and social forces that influence the association between interior immigration detention capacity and enforcement dynamics.
+
+##### Demographic variables
+The size, composition, and spatial distribution of populations and how these features change over time is important for understanding interior immigration detention and enforcement patterns.
+
+###### Total population
+```{r}
+# get acs 1-year estimates for county-level total population
+  # 2018
+    tot_pop <- get_acs(
+      geography = "county", 
+      variables = c("tot_pop" = "B01003_001"),
+      year = 2018,
+      survey = "acs1")
+
+#   "lat_am_pop" = "B05007_040", # PLACE OF BIRTH BY YEAR OF ENTRY BY CITIZENSHIP STATUS FOR THE LATIN AMERICAN FOREIGN-BORN POPULATION 
+# "foreign_born_pop" = "B05007_001"), # PLACE OF BIRTH BY YEAR OF ENTRY BY CITIZENSHIP STATUS FOR THE FOREIGN-BORN POPULATION
+#
+
+```
+
+###### Population growth or decline
+```{r}
+
+### create change scores 
+```
+
+###### Urban-rural status
+```{r}
+
+```
+
+##### Economic variables
+Income and wealth, poverty and affluence, labor market dynamics, and job placement are examples of economic variables.
+
+###### Median household income 
+```{r }
+
+ med_income <- get_acs(
+  geography = "county", 
+              year = 2018,
+              variables = c(medincome = "B19013_001",
+                            fb = "B05012_003", 
+                            totp = "B05012_001"), # d
+              survey = "acs1",
+              geometry = TRUE)
+
+```
+
+##### Social variables
+Social variables include educational attainment, ethnoracial composition, and suburbanization.
+
+###### Race-ethnicity
+```{r }
+race <- get_acs(
+  geography = "county", 
+  variables = c(white_pop = "P005003", black_pop = "P005004", 
+              asian_pop = "P005006", 
+              hispanic_pop = "P004003"), 
+  geometry = TRUE,
+  summary_var =) 
+
+# # plot of race/ethnicity by county in Illinois for 2010
+# library(tidycensus)
+# library(tidyverse)
+# library(viridis)
+# # census_api_key("YOUR KEY GOES HERE")
+# vars10 <- c("P005003", "P005004", "P005006", "P004003")
+# 
+# il <- get_decennial(geography = "county", variables = vars10, year = 2010,
+#                     summary_var = "P001001", state = "IL", geometry = TRUE) %>%
+#   mutate(pct = 100 * (value / summary_value))
+# 
+# ggplot(il, aes(fill = pct, color = pct)) +
+#   geom_sf() +
+#   facet_wrap(~variable)
+```
+
+###### Immigration
+```{r }
+# library(tigris)
+# options(tigris_use_cache = TRUE)
+# 
+# # load places in Washington
+# wa <- places("WA", year = 2018, class = "sf")
+# # get the water bodies of King County
+# king_water <- area_water("WA", "King", class = "sf") 
+# 
+# # filter to Seattle
+# seattle <- 
+#     wa %>%
+#     filter(NAME == "Seattle")
+# 
+# ggplot(seattle) + 
+#     geom_sf(fill = "transparent") + 
+#     theme_minimal() 
+# 
+# seattle_tracts <- 
+#     tract_hh_prop %>%
+#     # add some wiggle room around shape
+#     st_buffer(1e-5) %>%
+#     # cut the outline of Seattle
+#     st_intersection(seattle) %>%
+#     # remove water areas from the map
+#     st_difference(st_union(king_water))
+# ggplot(seattle_tracts) + 
+#     geom_sf(fill = "white") + 
+#     theme_minimal()
+```
+
+###### Education
+```{r }
+# load (tidy)census decennial and inter-decennial rectangular (acs) data
+#   # download the variable dictionary
+#   var_df_2013 <- load_variables(2013, "acs5", cache = TRUE)
+#   var_df_2014 <- load_variables(2014, "acs5", cache = TRUE)
+#   var_df_2015 <- load_variables(2015, "acs5", cache = TRUE)
+#   var_df_2016 <- load_variables(2016, "acs5", cache = TRUE)
+#   var_df_2017 <- load_variables(2017, "acs5", cache = TRUE)
+#   var_df_2018 <- load_variables(2018, "acs5", cache = TRUE)
+#
+
+# Use the View function to see where educational attainment variables are
+# SEARCH in concept "Educational Attainment"
+# then narrow down using the name field B15003_02
+
+var_selection <- c(Bachelor = "B15003_022")
+
+raw_tract_edu_df <- get_acs("tract",
+                            variables = var_selection,
+                            summary_var = "B15003_001",
+                            state = "WA",
+                            county = "King",
+                            geometry = TRUE,
+                            moe = 95,
+                            cache_table = TRUE)
+```
+
+#### Data on detention facilities
+The Enforcement and Removal Operations (ERO) division within ICE deals directly with the detention of immigrants. Detention facilities are uniquely identified by a location code (i.e., `detloc`). Other geographic variables include facility name, street address, city, county, state, and ZIP code. Facilities are also located within an area of responsibility (AOR).
+
+
+
+
+
+```{r check_detloc, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+
+# ERO, under ICE, operates eight detention centers, termed "Service Processing Centers," in Aguadilla, Puerto Rico; Batavia, New York; El Centro, California; El Paso, Texas; Florence, Arizona; Miami, Florida; Los Fresnos, Texas; and San Pedro, California.
+# 
+# ICE also has contracts with seven private companies that run facilities in Aurora, Colorado; Houston, Texas; Laredo, Texas; Tacoma, Washington; Elizabeth, New Jersey; Queens, New York; and San Diego, California.
+# 
+# Other facilities that house immigrant detainees include juvenile detention centers and shelters.
+# 
+# However, the majority of immigrants are detained in state and local jails, which have contracts with ICE. According to the list of detention sites produced by the Global Detention Project, at the end of the 2007 fiscal year, the immigration detention system of the US comprised 961 sites.
+
 # detloc
 # check levels
 class(df_facilities$detloc)
@@ -134,9 +759,8 @@ df_facilities %>%
 df_facilities <- df_facilities %>%
   mutate(detloc = as.factor(detloc))
 ```
-
-#### Facility name
-```{r name, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+##### Facility name
+```{r check_name, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # name
 # check levels
 class(df_facilities$name)
@@ -158,9 +782,8 @@ df_facilities %>%
 df_facilities %>%
   summarise(count = n_distinct(name)) # 1407 unique facility names
 ```
-
-#### Facility street address
-```{r address, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+##### Facility street address
+```{r check_address, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # address
 # check levels
 class(df_facilities$address)
@@ -182,9 +805,8 @@ df_facilities %>%
 df_facilities %>%
   summarize(count = n_distinct(address)) # 1416 facility addresses
 ```
-
-#### Facility state
-```{r state, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+##### Facility state
+```{r check_state, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # state
 # check levels
 class(df_facilities$state)
@@ -222,9 +844,8 @@ prop.table(tab1)
 df_facilities %>%
   count(state)
 ```
-
-#### Facility city
-```{r city, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+##### Facility city
+```{r check_city, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # city
 # check levels
 class(df_facilities$city)
@@ -258,9 +879,8 @@ df_facilities %>%
     geom_bar() +
     theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 ```
-
-#### Facility ZIP code
-```{r zip, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+##### Facility ZIP code
+```{r check_zip, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # zip
 # check levels
 class(df_facilities$zip)
@@ -293,9 +913,8 @@ prop.table(tab1)
 df_facilities %>%
   count(zip)
 ```
-
-#### Facility area of responsibility (AOR)
-```{r aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+##### Facility area of responsibility (AOR)
+```{r check_aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # aor
 # check levels
 class(df_facilities$aor)
@@ -303,7 +922,8 @@ class(df_facilities$`aor`)
 class(df_facilities$"aor")
 
 df_facilities %>%
-  count(aor) # 24 rows
+  count(aor) %>% # 24 rows
+  print(n = 24)
 df_facilities %>%
   count(`aor`) # 24 rows
 df_facilities %>%
@@ -328,9 +948,8 @@ prop.table(tab1)
 df_facilities %>%
   count(aor)
 ```
-
-#### Facility type
-```{r type, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+##### Facility type
+```{r check_type, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # type                   
 # check levels
 class(df_facilities$type)
@@ -363,11 +982,9 @@ prop.table(tab1)
 df_facilities %>%
   count(type)
 ```
-
-#### Average daily population (ADP)
+##### Average daily population (ADP)
 I will calculate summary statistics for the average daily population (ADP). I also plot their distributions.
-
-```{r adp, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+```{r check_adp, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # fy18_adp
 summarize(df_facilities, `Fiscal Year` = "2018", `Average Daily Popluation` = mean(fy18_adp)) %>% pander()
   # calculate summary statistics
@@ -396,7 +1013,6 @@ summarize(df_facilities, `Fiscal Year` = "2016", `Average Daily Popluation` = me
   
   summarize(df_facilities, `Fiscal Year` = "2016", `Average Daily Popluation` = sum(fy16_adp)) %>% pander()
 
-  
   # plot levels
   ggplot(df_facilities) + 
     geom_histogram(mapping = aes(x = fy16_adp))
@@ -479,63 +1095,509 @@ summarize(df_facilities, `Fiscal Year` = "2009", `Average Daily Popluation` = me
   ggplot(df_facilities) + 
     geom_histogram(mapping = aes(x = fy09_adp))
 ```
-
 The average daily population for each detention facility is available for `r df_facilities %>% summarise(count = n_distinct(adp))`, respectively.
 
-The probability distributions of the average daily population for the facilities in every year is skewed right. That is, in every year, there are many more facilities that hold very few detainees than there are few facilities that hold many detainees. However, the majority of detention facilities hold zero prisoners in a fiscal year. As a result, the "average" average daily population is XXX.
+The probability distributions of the average daily population for the facilities in every year is skewed right. That is, in every year, there are many more facilities that hold very few detainees than there are few facilities that hold many detainees.
 
-### Collapse data frame to a single row by group
-There are three steps to prepare these data. First, I group facilities by area of responsibility (AOR). Second, I summarize across AORs to compute average daily population, number of facilities, and proportion of facility types. 
+##### Capacity
+The number of beds is available for fiscal year 2018.
 
-```{r df_aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+```{r check_capacity, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 
-#%>% 
-#   select(aor, detloc, city, zip, everything()) %>%
-#   arrange(aor, detloc, city, zip)
+# CAPACITY IS AVAILABLE IN EACH SNAPSHOT OF ERO DATA (I.E., FOIA REQUEST FACILITY LIST)
+# DOES NUMBER OF AS NEEDED FACILITIES CHANGE OVER TIME?
+# DO FACILITIES SHIFT FROM COUNTS TO AS NEEDED, OR VICE VERSA?
+# WHAT OTHER FACILITY-LEVEL CHARACTERISTICS CHANGE OVER TIME?
 
-  #df_facilities %>% count(n_distinct(aor))
-  # unique(df_facilities$aor)
-  # count number of AORs
- # df_facilities %>% group_by(aor) %>% tally() %>% pander()
+# capacity
+# check levels
+class(df_facilities$capacity)
+class(df_facilities$`capacity`)
+class(df_facilities$"capacity")
 
-# # aggregate facilities to AOR
-# df_aor <- df_facilities %>%
-#   group_by(aor) %>% 
-#   mutate(
-#     n_detloc = n_distinct(detloc), # number of facilities
-#     n_city = n_distinct(city), # number of unique cities
-#     n_county = n_distinct(county), # number of unique counties
-#     n_state = n_distinct(state), # number of unique states 
-#     n_zip = n_distinct(zip)) %>% # number of unique zip codes
-#   group_by(aor, n_detloc, n_city, n_county, n_state, n_zip) %>%
-#   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
-#   ungroup()
+df_facilities %>%
+  count(capacity) %>% # 87 rows
+  print(n = 100)
+df_facilities %>%
+  count(`capacity`) # 87 rows
+df_facilities %>%
+  count("capacity") # 1685 rows
+table(df_facilities$capacity)
 
+# plot number of facilities within AORs
+ df_facilities %>%
+   mutate(capacity = capacity %>% fct_infreq() %>% fct_rev()) %>%
+   ggplot(aes(capacity)) +
+     geom_bar() +
+     theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 
-# aggregate facilities to AOR
-df_aor <- df_facilities %>%
-  group_by(aor) %>% 
-  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
-  ungroup()
+# # convert to factor
+# df_facilities <- df_facilities %>%
+#   mutate(aor = as.factor(capacity))
+
+# check proportions
+ table(df_facilities$capacity)
+ tab1 <- table(df_facilities$capacity)
+ prop.table(tab1) # AS NEEDED = 0.9115727003%
+ df_facilities %>%
+   count(capacity) %>%
+   print(as_tibble(), n = 100) # AS NEEDED = 1536
+```
+##### Current fiscal year utilization
+```{r check_current_fiscal_year_utilization, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# WHAT IS THE SIGNIFICANCE OF THIS RATE?
+# MIGHT NOT BE USEFUL SINCE 91 PERCENT OF DATA ARE "AS NEEDED"
 ```
 
-## Tidy data 
+##### Facility shutdown
+```{r check_closed_detention_centers, eval=FALSE, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+
+# WHAT DOES FIRST AND LAST DAY OF USE INDICATE?
+# WHAT FACILITIES ENTER AND EXIT THE DATASET?
+
+View(df_facilities)
+
+df_closed_facilities <- df_facilities %>%
+  filter(name == "ADAMS COUNTY JAIL" | 
+           name == "ADA COUNTY JAIL" | 
+           name == "ADDISON COUNTY JAIL" | 
+           name == "AGUADILLA" | 
+           name == "ALAMANCE COUNTY DETENTION FACILITY"	| 
+           name == "ALBUQUERQUE HOLD ROOM")
+View(df_closed_facilities)
+
+
+# 
+# Ada County Jail	United States	Boise, Idaho	Closed (or ceased migrant detention operations) (2019)
+# Adams County Jail	United States	Brighton, Colorado	Closed (or ceased migrant detention operations) (2012)
+# Addison County Jail	United States	Middlebury, Vermont	Closed (or ceased migrant detention operations) (2012)
+# Aguadilla Service Processing centre (Aguadilla SPC)	United States	Aguadilla, Puerto Rico	Closed (or ceased migrant detention operations) (2011)
+# Alamance County Detention centre (Alamance County Detention Facility)	United States	Graham, North Carolina	Pending opening (2017)
+# Albuquerque Hold Room	United States	Albuquerque, New Mexico	Closed (or ceased migrant detention operations) (2015)
+```
+
+#### Data on enforcement practices
+Measured at the occassion, enforcement practices include three variables: encounters, arrests, and removals.
+
+##### Data on arrests
+Arrests are incident-level data with variables identifying AOR as well as apprehension date.
+```{r check_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# count arrests by aor
+df_arrests %>%
+  count(aor) %>%
+  filter(n > 1) %>%
+  print(as_tibble(), n = 100) # NAs = 3808 obs and HQ = 41 obs
+
+df_arrests %>%
+  count(aor) # 26 rows
+df_arrests %>%
+  count(`aor`) # 26 rows
+df_arrests %>%
+  count("aor") # 544059 rows
+table(df_arrests$aor)
+
+# count aors
+df_arrests %>%
+  summarise(count = n_distinct(aor)) # 26 unique obs
+  levels(as.factor(df_arrests$aor))
+
+# inspect apprehension dates
+df_arrests %>%
+  count(apprehension_date) %>%
+  filter(n > 1)
+
+# separate apprehension date into month, day, and year
+df_arrests <- df_arrests %>% 
+  separate(apprehension_date, 
+           into = c(
+             "apprehension_month", 
+             "apprehension_day", 
+             "apprehension_year")) # %>%
+  #rename(fiscal_year = apprehension_year)
+
+
+# count arrests by year
+df_arrests %>%
+  count(apprehension_year)
+    # 1 2015         27564
+    # 2 2016        109950
+    # 3 2017        155550
+    # 4 2018        154378
+    # 5 2019         96617
+```
+
+##### Data on encounters
+Encounters are incident-level data with variables identifying AOR as well as date.
+```{r check_encounters, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# count encounters by aor
+df_encounters %>%
+  count(aor) %>%
+  filter(n > 1) %>%
+  print(as_tibble(), n = 100) # NAs = 80421 and HQ = 12150
+
+# count aors
+df_encounters %>%
+  summarise(count = n_distinct(aor)) # 26 unique obs
+  levels(as.factor(df_encounters$aor)) # 25 uniqe obs without NAs
+
+# inspect event dates
+df_encounters %>%
+  count(event_date) %>%
+  filter(n > 1)
+
+# separate event date into month, day, and year
+df_encounters <- df_encounters %>% 
+  separate(event_date, 
+           into = c(
+             "event_month", 
+             "event_day", 
+             "event_year")) # %>%
+  #rename(fiscal_year = event_year) 
+
+
+# count encounters by year
+df_encounters %>%
+  count(event_year)
+    # 1 2015         84071
+    # 2 2016        380785
+    # 3 2017        455686
+    # 4 2018        478701
+    # 5 2019        290135
+```
+
+##### Data on removals
+Removals are incident-level data with variables identifying AOR as well as dates of apprehensions, departures, and deportations.
+```{r check_removals, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# count removals by aor
+df_removals %>%
+  count(aor) %>%
+  filter(n > 1) %>%
+  print(as_tibble(), n = 100) # NAs = 0 and HQ = 40
+
+# count aors
+df_removals %>%
+  summarise(count = n_distinct(aor)) # 25 unique obs
+  levels(as.factor(df_removals$aor))
+
+# inspect apprehension dates
+df_removals %>%
+  count(apprehension_date) %>%
+  filter(n > 1)
+
+# inspect departed dates
+df_removals %>%
+  count(departed_date) %>%
+  filter(n > 1)
+
+# inspect removal dates
+df_removals %>%
+  count(removal_date) %>%
+  filter(n > 1)
+
+# separate apprehension date into month, day, and year
+df_removals <- df_removals %>% 
+  separate(apprehension_date, 
+           into = c(
+             "apprehension_month", 
+             "apprehension_day", 
+             "apprehension_year")) #%>%
+  #rename(fiscal_year = apprehension_year)
+
+  df_removals %>%
+    count(apprehension_year)
+
+# separate departed date into month, day, and year
+df_removals <- df_removals %>% 
+  separate(departed_date, 
+           into = c(
+             "departed_month", 
+             "departed_day", 
+             "departed_year")) # %>%
+  #rename(fiscal_year = departed_year) 
+
+  df_removals %>%
+    count(departed_year)
+    # 1 2014             312
+    # 2 2015           63782
+    # 3 2016          246599
+    # 4 2017          218293
+    # 5 2018          262740
+    # 6 2019          172246
+  
+# separate removal date into month, day, and year
+df_removals <- df_removals %>% 
+  separate(removal_date, 
+           into = c(
+             "removal_month", 
+             "removal_day", 
+             "removal_year")) # %>%
+  #rename(fiscal_year = removal_year)
+
+  df_removals %>%
+    count(removal_year)
+    # 1 2015          61988
+    # 2 2016         246641
+    # 3 2017         218317
+    # 4 2018         263131
+    # 5 2019         173895
+```
+
+### Summarize data frame to a single row by group
+The current analysis is interested in the characteristics of areas of responsibility (AORs). Because our unit of analysis is the AOR, I change the scope of each function from operating on the entire dataset of facilities to operating on it group-by-group. I aggregate characteristics of facilities before recalculating summary statistics. I collapse the many facility-level values down to a single summary at the AOR-level and by year.
+
+#### Sample selection
+
+Imagine that we want to explore the relationship between the number of arrests, encounters, and removals (i.e., enforcement practices) and average daily jail population (ADP) for each area of responsibility (AOR). There are three steps to prepare these data on ADP:
+* Group facilities, encounters, arrests, and removals by area of responisibility (AOR).
+* Summarize to compute the numbers of removals, arrests, and encounters, as well as the sum of the average daily population (ADP).
+* Filter to remove noisy points and inspect outliers.
+
+##### Events
+I will summarize arrests by year within each AOR.
+```{r aggregate_arrests_to_aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# aggregate arrests to aor
+df_aor_arrests <- df_arrests %>%
+  group_by(aor, apprehension_year) %>% 
+  summarize(n_arrests = n()) %>%
+  ungroup()
+#View(df_aor_arrests)
+
+# count arrests by aor
+df_aor_arrests %>%
+  count(aor) %>%
+  print(as_tibble(), n = 100) # NAs = 5 and HQ = 5
+
+# count aors
+df_aor_arrests %>%
+  summarise(count = n_distinct(aor)) # 26 unique obs
+  levels(as.factor(df_aor_arrests$aor)) # 25 unique obs
+
+# # convert aor and apprehension_year to factor
+# df_aor_arrests <- df_aor_arrests %>%
+#   mutate(apprehension_year = as.factor(apprehension_year),
+#          aor = as.factor(aor))
+# class(df_aor_arrests$aor) 
+# class(df_aor_arrests$apprehension_year) 
+
+# plot arrests levels
+  ggplot(df_aor_arrests) + 
+    geom_histogram(mapping = aes(x = n_arrests))
+
+# plot arrests by fiscal year across aor
+ggplot(data = df_aor_arrests,
+       aes(x = apprehension_year, 
+           y = n_arrests, 
+           group = aor, 
+           color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Number of Arrests") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("arrests.pdf")
+
+# plot arrests by fiscal year across aor with facet wrap 
+ggplot(data = df_aor_arrests,
+       aes(x = apprehension_year, 
+           y = n_arrests, 
+           group = aor, 
+           color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Number of Arrests") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("arrests_facet.pdf")
+
+```
+
+Next, I summarize encounters by year within each AOR.
+```{r aggregate_encounters_to_aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# aggregate encounters to aor
+df_aor_encounters <- df_encounters %>%
+  group_by(aor, event_year) %>% 
+  summarize(n_encounters = n()) %>%
+  ungroup()
+#View(df_aor_encounters)
+
+# count encounters by aor
+df_aor_encounters %>%
+  count(aor) %>%
+  print(as_tibble(), n = 100) # NAs = 5 obs and HQ = 5 obs
+
+df_aor_encounters %>%
+  count(aor) # 26 rows
+df_aor_encounters %>%
+  count(`aor`) # 26 rows
+df_aor_encounters %>%
+  count("aor") # 130 rows
+table(df_aor_encounters$aor)
+
+# count aors
+df_aor_encounters %>%
+  summarise(count = n_distinct(aor)) # 26 unique obs
+  levels(as.factor(df_aor_encounters$aor)) # 25 unique obs
+
+# inspect apprehension dates
+df_aor_encounters %>%
+  count(event_year) %>%
+  filter(n > 1)
+
+# plot encounters levels
+  ggplot(df_aor_encounters) + 
+    geom_histogram(mapping = aes(x = n_encounters))
+
+# plot encounters by fiscal year across aor
+ggplot(data = df_aor_encounters,
+       aes(x = event_year, y = n_encounters, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Number of Encounters") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("encounters.pdf")
+
+
+# plot encounters by fiscal year across aor with facet wrap 
+ggplot(data = df_aor_encounters,
+       aes(x = event_year, y = n_encounters, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Number of Encounters") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("encounters_facet.pdf")
+
+
+# # plot
+# ggplot(data = df_aor_encounters, aes(x = event_year, y = n_encounters, group = aor)) +
+#   geom_line() +
+#   geom_line(stat = "smooth", method = "loess",
+#             aes(group = aor)) +
+#   facet_wrap(~ aor) +
+#   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+```
+
+Finally, I summarize removals by year within each AOR.
+```{r aggregate_removals_to_aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
+# aggregate removals to aor
+df_aor_removals <- df_removals %>%
+  group_by(aor, removal_year) %>% 
+  summarize(n_removals = n()) %>%
+  ungroup()
+#View(df_aor_removals)
+
+# # convert aor and removal_year to factor
+# df_aor_removals <- df_aor_removals %>%
+#   mutate(removal_year = as.factor(removal_year),
+#          aor = as.factor(aor))
+# class(df_aor_removals$aor) 
+# class(df_aor_removals$removal_year) 
+
+# plot removals levels
+  ggplot(df_aor_removals) + 
+    geom_histogram(mapping = aes(x = n_removals))
+
+  # plot removals by fiscal year
+ggplot(data = df_aor_removals,
+       aes(x = removal_year, y = n_removals)) + 
+  geom_point() +
+  xlab("Fiscal Year") +
+  ylab("Number of Removals") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+
+
+  ## plot change over time in removals (animated)
+  # library(ggplot2)
+  # install.packages("gganimate")
+  # library(gganimate)
+  # install.packages("gapminder")
+  # library(gapminder)
+  # theme_set(theme_bw())  # pre-set the bw theme.
+  # 
+  # g <- ggplot(gapminder, aes(gdpPercap, lifeExp, size = pop, frame = year)) +
+  #   geom_point() +
+  #   geom_smooth(aes(group = year), 
+  #               method = "lm", 
+  #               show.legend = FALSE) +
+  #   facet_wrap(~continent, scales = "free") +
+  #   scale_x_log10()  # convert to log scale
+  # 
+  # gganimate(g, interval=0.2)
+
+# plot removals by fiscal year across aor
+ggplot(data = df_aor_removals,
+       aes(x = removal_year, y = n_removals, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Number of Removals") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("removals.pdf")
+
+# plot removals by fiscal year across aor with facet wrap 
+ggplot(data = df_aor_removals,
+       aes(x = removal_year, y = n_removals, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Number of Removals") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("removals_facet.pdf")
+
+# # plot
+# ggplot(data = df_aor_removals, aes(x = removal_year, y = n_removals, group = aor)) +
+#   geom_line() +
+#   geom_line(stat = "smooth", method = "loess",
+#             aes(group = aor)) +
+#   facet_wrap(~ aor) +
+#   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+```
+
+##### Counties
+I also summarize demographic, economic, and social county-level data to their respective AORs.
+```{r aggregate_counties_to_aor, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+# aggregate counties to aor
+
+```
+
+##### Facilities
+```{r aggregate_adp_to_aor, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+# aggregate adp to aor
+df_aor_adp <- df_facilities %>%
+  group_by(aor) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  ungroup() # 24 AORs
+```
+
+## Tidy data
+Now that I have imported my data, it is a good idea to tidy it. Tidying your data means storing it in a consistent form that matches the semantics of the dataset with the way it is stored. In brief, when your data is tidy, each column is a variable, and each row is an observation. Tidy data is important because the consistent structure lets you focus your struggle on questions about the data, not fighting to get the data into the right form for different functions.
+
 ### Reshape data wide to long
+Now that I have the ICE facility-level data (2009-2018) loaded into `R` and processed to be technically correct, I create an additional data frame that reshapes the data from wide to long. I need to set up the data so they are in both wide and long formats for different parts of these analyses. In the wide format, the repeated responses for an observation are in a single row (e.g., facility), and each response is in a separate column (e.g., ADP for FY2013). In the long format, each row is one time point per observation, so each facility will have data in multiple rows. At the conclusion of wrangling these data, I will be able to provide both cross-sectional and longitudinal analyses of interior immigration enforcement and detention patterns and dynamics.
 
-Now that I have the ICE facility-level data loaded into `R` and processed to be technically correct, I create an additional data frame that reshapes the data from wide to long. I need to set up the data so they are in both wide and long formats for different parts of these analyses. In the wide format, the repeated responses for an observation (e.g., facility) will be in a single row, and each response is in a separate column. In the long format, each row is one time point per observation, so each facility will have data in multiple rows. There are at least three reasons for structuring data. First, software requirements. For example, the wide format is required for software to execute MANOVA and repeated measures procedures. Likewise, mixed models and many survival analysis procedures require data to be in the long format. Second, analytical implications. For instance, in the wide format, the unit of analysis is the facility whereas each measurement occasion for each facility is the unit of analysis in the long format. Third, the practical difference is that when the occasion is the unit of analysis (i.e., long), I can use each decade’s college education rate as a covariate for the same decade’s jobs value. In the wide format, when the unit of observation is the facility, there is no way to do this. I can use any of the college rates as covariates for all years, but I cannot have decade-specific covariates.
+There are at least three reasons for structuring data. First, software requirements. For example, the wide format is required for software to execute MANOVA and repeated measures procedures. Likewise, mixed models and many survival analysis procedures require data to be in the long format. Second, analytical implications. For instance, in the wide format, the unit of analysis is the facility whereas each measurement occasion for each facility is the unit of analysis in the long format. Third, the practical difference is that when the occasion is the unit of analysis (i.e., long), I can use each year’s average daily population (ADP) as a covariate for the same year’s encounters, arrests, or removals values. In the wide format, when the unit of observation is the facility, this is not possible. I can use any of the ADP values as covariates for all years, but I cannot have year-specific covariates. The individual-level records on encounters, arrests, and removals (2015-2019) are structured to be long.
 
-The facility-level data frame is structured to be wide.
+#### Pivot capacity wide to long
+```{r}
+# pivot capacity wide to long
+# plot levels
+# plot levels by year
+# plot levels by year across aor
+```
 
-Longitudinal data are especially useful for understanding change over time within an AOR, county, city, and facility. 
-
-Such data are structured in long-format, requiring a particular set of statistical techniques to remove bias associated with interdependence of repeated measures. 
-
-Data in long format differ from data in wide format with regard to their analytical requirements. 
-
-At the conclusion of wranging these data, I will be able to provide both cross-sectional and longitudinal analyses of ICE detention facilities.
-
-```{r pivoting_df_aor_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
-df_aor_long <- df_aor %>% 
+#### Pivot average daily population wide to long
+```{r pivot_adp_wide_to_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# pivot adp wide to long
+df_aor_adp_long <- df_aor_adp %>% 
   pivot_longer(
     cols = starts_with("fy"),
     names_to = "key",
@@ -550,373 +1612,1206 @@ df_aor_long <- df_aor %>%
     names_from = c(adp), 
     values_from = cases)
 
-# convert to factor
-df_aor_long <- df_aor_long %>%
+# convert fiscal_year to factor
+df_aor_adp_long <- df_aor_adp_long %>%
   mutate(fiscal_year = as.factor(fiscal_year))
-class(df_aor_long$fiscal_year) 
+class(df_aor_adp_long$fiscal_year) 
 
-# recode variable values
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy18'] <- '2018'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy17'] <- '2017'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy16'] <- '2016'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy15'] <- '2015'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy14'] <- '2014'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy13'] <- '2013'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy12'] <- '2012'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy11'] <- '2011'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy10'] <- '2010'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy09'] <- '2009'
+# recode fiscal_year values
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy18'] <- '2018'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy17'] <- '2017'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy16'] <- '2016'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy15'] <- '2015'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy14'] <- '2014'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy13'] <- '2013'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy12'] <- '2012'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy11'] <- '2011'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy10'] <- '2010'
+levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy09'] <- '2009'
 
-# plot levels
-  ggplot(df_aor_long) + 
+# plot adp levels
+  ggplot(df_aor_adp_long) + 
     geom_histogram(mapping = aes(x = adp))
-  
+
 # plot adp by fiscal year across aor
-ggplot(data = df_aor_long,
+ggplot(data = df_aor_adp_long,
        aes(x = fiscal_year, y = adp, group = aor, color = aor)) + 
   geom_line() +
   xlab("Fiscal Year") +
-  ylab("Average Daily Population (ADP)") +
- # ggtitle("Average Daily Population (ADP), 2009-2018") +
+  ylab("Average Daily Population (ADP)") + 
+  ggtitle("Average Daily Population (ADP), 2009-2018") +
   theme_bw() + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("adp.pdf")
 
-# plot adp by fiscal year across aor facet wrap 
-ggplot(data = df_aor_long,
+
+# plot adp by fiscal year across aor with facet wrap 
+ggplot(data = df_aor_adp_long,
        aes(x = fiscal_year, y = adp, group = aor, color = aor)) + 
   geom_line() +
   xlab("Fiscal Year") +
   ylab("Average Daily Population (ADP)") +
- # ggtitle("Average Daily Population (ADP), 2009-2018") +
+ ggtitle("Average Daily Population (ADP), 2009-2018") +
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("adp_facets.pdf")
 
 # # plot
-# ggplot(data = df_aor_long, aes(x = fiscal_year, y = adp, group = aor)) + 
-#   geom_line() + 
-#   geom_line(stat = "smooth", method = "loess", 
-#             aes(group = aor)) + 
-#   facet_wrap(~ aor)
+# ggplot(data = df_aor_adp_long, aes(x = fiscal_year, y = adp, group = aor)) +
+#   geom_line() +
+#   geom_line(stat = "smooth", method = "loess",
+#             aes(group = aor)) +
+#   facet_wrap(~ aor) +
+#   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
 ```
 
-I explore the distribution of each of the average daily population (ADP) variables in the ICE facilities dataset. For continuous variables, we can measure the centrality and the spread.  Measures of centrality are mean, median. Measures of spread are standard deviation, quantiles, min and max, range, interquartile range.
+#### Join relational data tables
+I join average daily population (ADP) and encounters, arrests, and removals at the AOR-level by year.
 
-Second, I create new variables with functions of existing variables (mutate()).
-
-Third, I collapse many values down to a single summary (summarise()). I use these in conjunction with group_by() which changes the scope of each function from operating on the entire dataset to operating on it group-by-group.
-
-summarise() is not terribly useful unless we pair it with group_by(). This changes the unit of analysis from the complete dataset to individual groups. Then, when you use the dplyr verbs on a grouped data frame they’ll be automatically applied “by group”. For example, if we applied exactly the same code to a data frame grouped by date, we get the average delay per date:
-
-
-
-Because our unit of analysis is the AOR, I change the scope of each function from operating on the entire dataset to operating on it group-by-group. That is, I collapse the many facility-level values down to a single summary at the AOR-level and by year.
-
-
-I reshape the wide AOR-level data to long.
-
-```{r pivoting_df_facilities_long, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
-
-# pivot wide to long
-df_facilities_long <- df_facilities %>%
-  pivot_longer(
-    cols = starts_with("fy"),
-    names_to = "key",
-    values_to = "cases",
-  ) 
-
-%>% 
-  separate(key, 
-           c("fiscal_year", 
-             "adp"), 
-           sep = "_"
-           ) %>% 
-  group_by(aor) %>%
-  mutate(row = row_number()) %>% 
-  pivot_wider(names_from = c(adp), 
-              values_from = cases) %>%
-  select(-row) 
-View(df_aor_long)
-
-# convert to factor
-df_aor_long <- df_aor_long  %>%
-  mutate(fiscal_year = as.factor(fiscal_year))
-class(df_aor_long$fiscal_year) 
-
-# recode variable values
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy18'] <- '2018'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy17'] <- '2017'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy16'] <- '2016'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy15'] <- '2015'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy14'] <- '2014'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy13'] <- '2013'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy12'] <- '2012'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy11'] <- '2011'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy10'] <- '2010'
-levels(df_aor_long$fiscal_year)[levels(df_aor_long$fiscal_year)=='fy09'] <- '2009'
-
-# calculate summary statistics
-  summary(select(df_aor_long, adp))
-  
-  # plot levels
-  ggplot(df_aor_long) + 
-    geom_histogram(mapping = aes(x = adp))
+##### Join detention data tables
+```{r join_df_aor_adp_capacity}
+# JOIN CAPACITY AND ADP TABLES
 ```
 
-Arrests are individual-level data with variables identifying AOR as well as apprehension date. I will summarize arrests by year within each AOR. I will then merge the arrests data with data on ADP by AOR. 
+##### Join enforcement data tables
+I join AOR-level data on ICE encounters, arrests, and removals. 
+```{r join_df_aor_enforcement_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# create empty data frame
+df_aor_enforcement_long <- data.frame(year = character(),
+                 aor = character(), 
+                 stringsAsFactors = FALSE)
 
-```{r arrests_df_aor, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
-# aggregate arrests to AOR-level
-View(df_arrests)
+# join aor-level encounters data
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  full_join(df_aor_encounters, 
+            by = c("aor", 
+                   c("year" = "event_year"))
+            )
+# join aor-level arrests data
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  full_join(df_aor_arrests, 
+            by = c("aor", 
+                   c("year" = "apprehension_year"))
+            )
+# join aor-level removals data
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  full_join(df_aor_removals, 
+            by = c("aor", 
+                   c("year" = "removal_year"))
+            )
 
-# separate apprehension date into month, day, and year
-df_arrests <- df_arrests %>% 
-  separate(apprehension_date, into = c("apprehension_month", "apprehension_day", "apprehension_year")) %>%
-  rename(fiscal_year = apprehension_year)
+# recode NA values
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  mutate(aor = replace_na(aor, "UNKNOWN"))
+```
 
-# collapse arrests to summarize aor
-df_arrests_aor <- df_arrests %>%
-  group_by(aor, fiscal_year) %>% 
-  summarize(n_arrests = n()) %>%
-  ungroup()
-View(df_arrests_aor)
+##### Join detention and enforcement data tables 
+```{r join_df_aor_detention_enforcement_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# create empty data frame
+df_aor_adp_enforcement_long <- data.frame(year = character(),
+                 aor = character(), 
+                 stringsAsFactors = FALSE)
 
-# join aor-level adp and arrests data
-newdf <- df_aor_long %>%
-  left_join(df_arrests_aor, 
-            by = c("aor", "fiscal_year"))
+# join adp and enforcement data
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+  full_join(df_aor_adp_long,
+            by = c("aor", 
+                   c("year" = "fiscal_year"))
+            )
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+  full_join(df_aor_enforcement_long,
+            by = c("aor", "year")
+            ) %>%
+    arrange(aor, year, adp)
+
 
 # convert to factor
-newdf <- newdf %>%
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
   mutate(aor = as.factor(aor), 
-         fiscal_year = as.factor(fiscal_year)
+         year = as.factor(year)
          )
+```
 
+##### Join ecological data frame
+The ecological context of each AOR is also attached to the data on detention capacity and enforcement practices.
+```{r join_df_aor_ecological_detention_enforcement_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# # create empty data frame
+# df_aor_adp_enforcement_long <- data.frame(year = character(),
+#                  aor = character(), 
+#                  stringsAsFactors = FALSE)
+
+# # join adp and enforcement data
+# df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+#   full_join(df_aor_ecology_long,
+#             by = c("aor", 
+#                    c("year" = "fiscal_year"))
+#             )
+# df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+#   full_join(df_aor_enforcement_long,
+#             by = c("aor", "year")
+#             ) %>%
+#     arrange(aor, year, adp)
+
+
+# # convert to factor
+# df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+#   mutate(aor = as.factor(aor), 
+#          year = as.factor(year)
+#          )
+```
+
+I am finished cleaning, augmenting, and preprocessing the data. I will now conduct an exploratory analysis of the data reflecting average daily population and encounters, arrests, and removals by AOR to get a better sense of interior immigration regimes of social control.
+
+There are two main engines of knowledge generation once I have tidy data with the variables I need: visualisation and modelling. These have complementary strengths and weaknesses so any real analysis will iterate between them many times.
+
+## Transform data
+Once you have tidy data, a common first step is to transform it. Transformation includes narrowing in on observations of interest (like all people in one city, or all data from the last year), creating new variables that are functions of existing variables (like computing speed from distance and time), and calculating a set of summary statistics (like counts or means). 
+
+### Add new variables
+It is often useful to add new columns that are functions of existing columns. There are two tasks at hand for our analyses:
+
+#### Privatization
+```{r add_new_variables_privatization, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# # generate percent private by aor
+# test <- df_aor_adp_enforcement_long %>%
+#   group_by(aor) %>%
+#   mutate(
+#     percent_private
+#   )
+          # # type                   
+          # # check levels
+          # class(df_facilities$type)
+          # class(df_facilities$`type`)
+          # class(df_facilities$"type")
+          # 
+          # df_facilities %>%
+          #   count(type) # 8 rows
+          # df_facilities %>%
+          #   count(`type`) # 8 rows
+          # df_facilities %>%
+          #   count("type") # 1685 rows
+          # table(df_facilities$type)
+          # 
+          # # plot levels with a bar chart
+          # df_facilities %>%
+          #   mutate(type = type %>% fct_infreq() %>% fct_rev()) %>%
+          #   ggplot(aes(type)) +
+          #     geom_bar() +
+          #     theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+          # 
+          # # convert to factor
+          # df_facilities <- df_facilities %>%
+          #   mutate(type = as.factor(type))
+          # 
+          # # check proportions
+          # table(df_facilities$type)
+          # tab1 <- table(df_facilities$type)
+          # prop.table(tab1)
+          # df_facilities %>%
+          #   count(type)
+```
+
+#### Changes in detention and enforcement patterns
+```{r add_new_variables_change_1yr, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# create one-year change variables in average daily population and enforcement practices
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>% 
+  group_by(aor) %>% 
+   # levels
+  mutate(
+    diff_adp = adp - lag(adp),
+    diff_n_encounters = n_encounters - lag(n_encounters), 
+    diff_n_arrests = n_arrests - lag(n_arrests),
+    diff_n_removals = n_removals - lag(n_removals),
+    # percents
+    pct_diff_adp = (diff_adp / lag(adp) * 100),
+    pct_diff_encounters = (diff_n_encounters / lag(n_encounters) * 100),
+    pct_diff_arrests = (diff_n_arrests / lag(n_arrests) * 100),
+    pct_diff_removals = (diff_n_removals / lag(n_removals) * 100)
+    ) %>%
+  ungroup()
+
+# plot percent change in adp by year across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = year, y = pct_diff_adp, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Year") +
+  ylab("Percent Change in Average Daily Population (ADP)") + 
+  ggtitle("Percent Change in Average Daily Population (ADP), 2009-2018") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("adp_over_time.pdf")
+
+# plot percent change in encounters by year across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = year, y = pct_diff_encounters, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Year") +
+  ylab("Percent Change in Encounters") + 
+  ggtitle("Percent Change in Encounters, 2015-2019") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("encounters_over_time.pdf")
+
+# plot percent change in arrests by year across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = year, y = pct_diff_arrests, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Year") +
+  ylab("Percent Change in Arrests") + 
+  ggtitle("Percent Change in Arrests, 2015-2019") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("arrests_over_time.pdf")
+
+# plot percent change in removals by year across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = year, y = pct_diff_removals, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Year") +
+  ylab("Percent Change in Removals") + 
+  ggtitle("Percent Change in Removals, 2015-2019") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("removals_over_time.pdf")
+
+```
+
+In advance of Exploratory Data Analysis (EDA) of the AOR-level data, I am going to prepare a cleaned version of the data set that does not include any missing data.
+
+
+```{r }
+df_aor_adp_enforcement_long_complete <- df_aor_adp_enforcement_long %>%
+  filter(!is.na(adp),           # remove missing adp
+         !is.na(n_encounters),  # remove missing encounters
+         !is.na(n_arrests),     # remove missing arrests
+         !is.na(n_removals))    # remove missing removals
+```
+
+
+# Explore data
+There are three common steps in an exploratory data analysis (EDA):
+1. Looking at the raw data values.
+2. Computing summary statistics, like means, medians, and interquartile ranges.
+3. Creating data visualizations.
+
+Two questions I will be answering in this section are:
+* What type of variation occurs within my variables?
+* What type of covariation occurs between my variables?
+
+## Variation
+Numerical summaries and graphical displays show the univariate distributions of average daily population and number of arrests. It is important to be able to understand how an individual variable is distributed before moving on to more sophisticated visualizations that enable multidimensional investigation. Visually understanding the distribution allows us to describe many features of a variable. For these continuous variables, I can measure the centrality and the spread. Measures of centrality are mean, median. Measures of spread are standard deviation, quantiles, min and max, range, interquartile range.
+
+### Calculate summary statistics and visualize distributions 
+First, I’ll calculate summary statistics for these variables and plot their distributions. This will highlight the typical and unusual values in our variables of interest.
+
+```{r calculate_summary_statistics_national, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+```
+
+```{r calculate_summary_statistics_annual, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+### START HERE
+#1 
+ggplot(data = gapminder, aes(x = year, y = lifeExp, group = country)) +
+  geom_line(aes(color = "Country")) +
+  geom_line(stat = "smooth", method = "loess", 
+            aes(group = continent, color = "Continent")) +
+  facet_wrap(~ continent, nrow = 2) +
+  scale_color_manual(name = "Life Exp. for:", values = c("Country" = "black", "Continent" = "blue"))
+
+#2
+ggplot(data = gapminder, aes(x = year, y = lifeExp, group = country)) +
+  geom_line(aes(color = "Country")) +
+  geom_line(stat = "smooth", method = "loess", 
+            aes(group = continent, color = "Continent")) +
+  scale_color_manual(name = "Life Exp. for:", values = c("Country" = "black", "Continent" = "blue"))
+
+#3
+ggplot(data = gapminder, aes(x = year, y = lifeExp, group = country)) +
+  geom_line(stat = "smooth", method = "loess", aes(group = continent, color = "Continent")) +
+  scale_color_manual(name = "Life Exp. for:", values = c("Country" = "black", "Continent" = "blue"))
+
+#4
+ggplot(data = gapminder, aes(x = year, y = lifeExp)) +
+  geom_line(stat = "smooth", method = "loess") +
+  facet_wrap(~ continent, nrow = 2) +
+  scale_color_manual(name = "Life Exp. for:", values = c("Country" = "black", "Continent" = "blue"))
+
+#5
+ggplot(data = gapminder, aes(x = year, y = lifeExp)) +
+  geom_line(stat = "smooth", method = "loess") +
+  scale_color_manual(name = "Life Exp. for:", values = c("Country" = "black", "Continent" = "blue"))
+```
+
+```{r calculate_summary_statistics_adp_enforcement, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# skim summary statistics
+df_aor_adp_enforcement_long_complete %>%
+ # select(adp, n_encounters, n_arrests, n_removals) %>% 
+  skim() # skewed right
+```
+
+#### Average daily population
+```{r summarize_visualize_distributions_adp, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # calculate summary statistics
-summary(newdf$n_arrests)
+  summary(df_aor_adp_enforcement_long_complete$adp)
+
+# visualize distribution
+  df_aor_adp_enforcement_long_complete %>% 
+    ggplot(aes(adp)) +
+    geom_density(fill="midnightblue")
+
+   # visualize distributions for adp
+      # plot density curve for adp
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x = adp)) + geom_density() # skewed right
+      # plot density curve for log adp
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x = log(adp))) + geom_density() # skewed left (?) outliers
+  
+      # plot histogram/bar graph for adp
+        # count
+        ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp)) +
+          geom_histogram(colour="black", fill="white")
+        # count log transformation
+        ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp))) +
+            geom_histogram(colour="black", fill="white")
+  
+      # plot levels for adp
+      ggplot(df_aor_adp_enforcement_long_complete) +
+        geom_histogram(mapping = aes(x = adp), binwidth = 300, na.rm = TRUE)
+  
+      # plot adp by fiscal year across aor
+        ggplot(data = df_aor_adp_enforcement_long_complete,
+             aes(x = year, y = adp, group = aor, color = aor)) +
+        geom_line() +
+        xlab("Fiscal Year") +
+        ylab("ADP") +
+       # ggtitle("Average Daily Population (ADP), 2009-2018") +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  
+      # plot adp by fiscal year across aor facet wrap
+      ggplot(data = df_aor_adp_enforcement_long_complete,
+             aes(x = year, y = adp, group = aor, color = aor)) +
+        geom_line() +
+        xlab("Fiscal Year") +
+        ylab("ADP") +
+       # ggtitle("Average Daily Population (ADP), 2009-2018") +
+        theme_bw() +
+        facet_wrap(~ aor) +
+        theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+```
+
+##### Typical values
+##### Unusual values
+
+#### Encounters
+```{r summarize_visualize_distributions_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# encounters
+  # visualize distributions for encounters
+  df_aor_adp_enforcement_long_complete %>% 
+    ggplot(aes(x = n_encounters, label = aor)) +
+    geom_density(fill="darkred")
+  
+  # visualize distributions for encounters
+    # plot density curve for encounters
+    ggplot(df_aor_adp_enforcement_long_complete, aes(x = n_encounters, label = aor)) + geom_density() # skewed right
+    # plot density curve for log encounters
+    ggplot(df_aor_adp_enforcement_long_complete, aes(x = log(n_encounters), label = aor)) + geom_density() # skewed left (?) outliers
+    
+    # plot histogram/bar graph for encounters
+      # count
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_encounters), label = aor) + 
+        geom_histogram(colour="black", fill="white")
+      # count with larger bins
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_encounters), label = aor) + 
+        geom_histogram(colour="black", fill="white", binwidth = 5000, na.rm = TRUE)
+      # count log transformation
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(n_encounters))) +
+          geom_histogram(colour="black", fill="white")
+
+    # plot levels for encounters
+    ggplot(df_aor_adp_enforcement_long_complete) + 
+      geom_histogram(mapping = aes(x = n_encounters), binwidth = 5000, na.rm = TRUE)
+    
+    # plot encounters by fiscal year across aor
+      ggplot(data = df_aor_adp_enforcement_long_complete,
+           aes(x = year, y = n_encounters, group = aor, color = aor)) + 
+      geom_line() +
+      xlab("Fiscal Year") +
+      ylab("Encounters") +
+     # ggtitle("Average Daily Population (ADP), 2009-2018") +
+      theme_bw() + 
+      theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  
+    # plot encounters by fiscal year across aor facet wrap 
+    ggplot(data = df_aor_adp_enforcement_long_complete,
+           aes(x = year, y = n_encounters, group = aor, color = aor)) + 
+      geom_line() +
+      xlab("Fiscal Year") +
+      ylab("Encounters") +
+     # ggtitle("Average Daily Population (ADP), 2009-2018") +
+      theme_bw() + 
+      facet_wrap(~ aor) + 
+      theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+```
+##### Typical values
+##### Unusual values
+
+#### Arrests
+```{r summarize_visualize_distributions_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# calculate summary statistics
+  summary(df_aor_adp_enforcement_long_complete$n_arrests)
+
+# visualize distributions for arrests
+  df_aor_adp_enforcement_long_complete %>% 
+    ggplot(aes(x = n_arrests, label = aor)) +
+    geom_density(fill="darkred")
+  
+  # visualize distributions for arrests
+    # plot density curve for arrests
+    ggplot(df_aor_adp_enforcement_long_complete, aes(x = n_arrests, label = aor)) + geom_density() # skewed right
+    # plot density curve for log arrests
+    ggplot(df_aor_adp_enforcement_long_complete, aes(x = log(n_arrests), label = aor)) + geom_density() # skewed left (?) outliers
+    
+    # plot histogram/bar graph for arrests
+      # count
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_arrests), label = aor) + 
+        geom_histogram(colour="black", fill="white")
+      # count with larger bins
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_arrests), label = aor) + 
+        geom_histogram(colour="black", fill="white", binwidth = 5000, na.rm = TRUE)
+      # count log transformation
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(n_arrests))) +
+          geom_histogram(colour="black", fill="white")
+
+    # plot levels for arrests
+    ggplot(df_aor_adp_enforcement_long_complete) + 
+      geom_histogram(mapping = aes(x = n_arrests), binwidth = 5000, na.rm = TRUE)
+    
+    # plot arrests by fiscal year across aor
+      ggplot(data = df_aor_adp_enforcement_long_complete,
+           aes(x = year, y = n_arrests, group = aor, color = aor)) + 
+      geom_line() +
+      xlab("Fiscal Year") +
+      ylab("Arrests") +
+     # ggtitle("Average Daily Population (ADP), 2009-2018") +
+      theme_bw() + 
+      theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  
+    # plot arrests by fiscal year across aor facet wrap 
+    ggplot(data = df_aor_adp_enforcement_long_complete,
+           aes(x = year, y = n_arrests, group = aor, color = aor)) + 
+      geom_line() +
+      xlab("Fiscal Year") +
+      ylab("Arrests") +
+     # ggtitle("Average Daily Population (ADP), 2009-2018") +
+      theme_bw() + 
+      facet_wrap(~ aor) + 
+      theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+```
+
+##### Typical values
+##### Unusual values
+
+#### Removals
+```{r summarize_visualize_distributions_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# removals
+  # visualize distributions for removals
+  df_aor_adp_enforcement_long_complete %>% 
+    ggplot(aes(x = n_removals, label = aor)) +
+    geom_density(fill="darkred")
+  
+  # visualize distributions for removals
+    # plot density curve for removals
+    ggplot(df_aor_adp_enforcement_long_complete, aes(x = n_removals, label = aor)) + geom_density() # skewed right
+    # plot density curve for log removals
+    ggplot(df_aor_adp_enforcement_long_complete, aes(x = log(n_removals), label = aor)) + geom_density() # skewed left (?) outliers
+    
+    # plot histogram/bar graph for removals
+      # count
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_removals), label = aor) + 
+        geom_histogram(colour="black", fill="white")
+      # count with larger bins
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_removals), label = aor) + 
+        geom_histogram(colour="black", fill="white", binwidth = 5000, na.rm = TRUE)
+      # count log transformation
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(n_removals))) +
+          geom_histogram(colour="black", fill="white")
+
+    # plot levels for removals
+    ggplot(df_aor_adp_enforcement_long_complete) + 
+      geom_histogram(mapping = aes(x = n_removals), binwidth = 5000, na.rm = TRUE)
+    
+    # plot removals by fiscal year across aor
+      ggplot(data = df_aor_adp_enforcement_long_complete,
+           aes(x = year, y = n_removals, group = aor, color = aor)) + 
+      geom_line() +
+      xlab("Fiscal Year") +
+      ylab("Removals") +
+     # ggtitle("Average Daily Population (ADP), 2009-2018") +
+      theme_bw() + 
+      theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  
+    # plot removals by fiscal year across aor facet wrap 
+    ggplot(data = df_aor_adp_enforcement_long_complete,
+           aes(x = year, y = n_removals, group = aor, color = aor)) + 
+      geom_line() +
+      xlab("Fiscal Year") +
+      ylab("Removals") +
+     # ggtitle("Average Daily Population (ADP), 2009-2018") +
+      theme_bw() + 
+      facet_wrap(~ aor) + 
+      theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+```
+##### Typical values
+##### Unusual values
+
+In summary, the ADP and arrests variables are skewed right, suggesting the presence of outliers. The distributions of these two variables likely violate the assumptions of ordinary least squares (OLS) regression analysis. I will use a log-transformation.
+
+## Covariation
+A solid understanding of univariate distributions is important. However, most analyses want to take the next step to understand associations and relationships between variables. 
+
+If variation describes the behavior within a variable, covariation describes the behavior between variables. Covariation is the tendency for the values of two or more variables to vary together in a related way. The best way to spot covariation is to visualize the relationship between two or more variables. Visualization should depend on the type of variables involved.
+
+### Estimate the population correlation
+Here we look at estimating and visualizing how two numerical variables are positively or negatively related. A correlation exists between two variables when one is related to the other such that there is co-movement. Positive co-movement means as one variable increases, the other variable also increases. Negative co-movement means as one variable increases, the other variable decreases.
+
+We will focus on the average annual growth rate of real GDP from 1960-1995 and the average number of years of schooling for adult residents in the country in 1960.
+
+```{r estimate_correlation_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# compute the pearson correlation coefficient
+  # adp and arrests: linear-linear
+  df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_arrests)) %>% pull(r)
+    # 0.4206693
+  # adp and encounters: linear-linear
+  df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_encounters)) %>% pull(r)
+    # 0.2734659
+    # adp and removals: linear-linear
+  df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_removals)) %>% pull(r)
+    # 0.8466138
+  
+      # cor(x = df_aor_adp_enforcement_long_complete$adp, 
+      #     y = df_aor_adp_enforcement_long_complete$n_arrests, 
+      #     method = 'pearson')
 
 
-# plot density curve
-ggplot(newdf, aes(x = n_arrests)) + geom_density()
-ggplot(newdf, aes(x = log(n_arrests))) + geom_density()
+  # adp and arrests: log-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_arrests))) %>% pull(r)
+    # 0.5371474
+  # adp and encounters: log-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_encounters))) %>% pull(r)
+    # 0.3917799
+  # adp and removals: log-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_removals))) %>% pull(r)
+    # 0.7930972
+            
 
-# plot bar graph
-ggplot(newdf, aes(x=n_arrests)) + 
-  geom_histogram(colour="black", fill="white")
+  # adp and arrests: linear-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_arrests))) %>% pull(r)
+    # 0.428049
+  # adp and encounters: linear-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_encounters))) %>% pull(r)
+    # 0.2878623
+  # adp and removals: linear-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_removals))) %>% pull(r)
+    # 0.7196122
+    
+    
+  # adp and arrests: log-linear
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_arrests)) %>% pull(r)
+    # 0.4876369
+      # adp and encounters: log-linear
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_encounters)) %>% pull(r)
+    # 0.3839146
+      # adp and removals: log-linear
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_removals)) %>% pull(r)
+    # 0.6775419
+    
+  # adp and arrests: log2-log2
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_arrests))) %>% pull(r)
+    # 0.5371474
+  # adp and encounters: log2-log2
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_encounters))) %>% pull(r)
+    # 0.5371474
+  # adp and removals: log2-log2
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_removals))) %>% pull(r)
+    # 0.7930972
+```
+
+Figure X shows a scatter plot of University GPA as a function of High School GPA. You can see from the figure that there is a strong positive relationship. The correlation is 0.78.
+
+Correlation is not always a good summary of the relationship between two variables. Our sample estimate for the correlation coefficient is positive, but is this enough evidence that there is a relationship between average daily population and number of arrests in the population? To answer this, let us conduct a hypothesis test with the following null and alternative hypotheses:
+
+```{r cor_test_arrests_adp, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# adp and arrests
+  cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
+           y = df_aor_adp_enforcement_long_complete$n_arrests, 
+           alternative="two.sided", conf.level=0.95, method='pearson')
+    # p-value = .00001977
+
+# log-log transformation
+cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
+         y = (log(df_aor_adp_enforcement_long_complete$n_arrests)), 
+         alternative="two.sided", conf.level=0.95, method='pearson') 
+    # p-value = .0000001679
+
+
+# adp and encounters
+  cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
+           y = df_aor_adp_enforcement_long_complete$n_encounters, 
+           alternative="two.sided", conf.level=0.95, method='pearson')
+    # p-value = 0.00702
+
+# log-log transformation
+cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
+         y = (log(df_aor_adp_enforcement_long_complete$n_encounters)), 
+         alternative="two.sided", conf.level=0.95, method='pearson') 
+    # p-value = 7.901e-05
+
+
+# adp and removals
+  cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
+           y = df_aor_adp_enforcement_long_complete$n_removals, 
+           alternative="two.sided", conf.level=0.95, method='pearson')
+    #  p-value < 2.2e-16
+
+# log-log transformation
+cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
+         y = (log(df_aor_adp_enforcement_long_complete$n_removals)), 
+         alternative="two.sided", conf.level=0.95, method='pearson') 
+    # p-value < 2.2e-16
+```
+
+The p-value for the hypothesis test is 0.0000001679, which is far below a common significance level of 0.05. With a high degree of confidence we can state we have found sufficient statistical evidence that the average years of schooling is correlated subsequent real GDP growth. The 95% confidence interval is also included in the output to cor.test. The results reveal an interval estimate for the population Pearson correlation coefficient between 0.095 and 0.53. With 95% confidence, this interval contains the true population Pearson correlation coefficient. This range includes all positive numbers, but ranges from somewhat weak but positive correlation to strong positive correlation.
+
+Patterns in your data provide clues about relationships. If a systematic relationship exists between two variables it will appear as a pattern in the data. If you spot a pattern, ask yourself:
+
+* Could this pattern be due to coincidence (i.e. random chance)?
+* How can you describe the relationship implied by the pattern?
+* How strong is the relationship implied by the pattern?
+* What other variables might affect the relationship?
+* Does the relationship change if you look at individual subgroups of the data?
+
+The visualization of choice when exploring the relationship between two variables, such as average daily population and arrests, is a scatterplot. Let us first create a scatterplot that illustrates the relationship between average daily population and the number of arrests.
+
+### Visualize bivariate relationship 
+A scatterplot of average daily population (ADP) versus the number of arrests shows a pattern: more arrests are associated with larger average daily populations.
+
+```{r scatterplot_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# plot adp and arrests
+plot_adp_arrests <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_arrests)) + 
+  geom_point(alpha = 0.5)
+  
+  plot_adp_arrests
+  
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_arrests)) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Arrests"))
+  
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_arrests)) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Arrests") + 
+      facet_wrap( ~ aor))
+
+# plot log adp and log arrests
+plot_log_adp_arrests <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_arrests))) + 
+  geom_point(alpha = 0.5)  
+
+  plot_log_adp_arrests
+
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_arrests))) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Arrests"))
+
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_arrests))) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Arrests") + 
+      facet_wrap( ~ aor))
+```
+
+
+```{r scatterplot_encounters, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# plot adp and encounters
+plot_adp_encounters <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_encounters)) + 
+  geom_point(alpha = 0.5)
+  
+  plot_adp_encounters
+  
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_encounters)) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Encounters"))
+  
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_encounters)) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Encounters") + 
+      facet_wrap( ~ aor))
+
+# plot log adp and log encounters
+plot_log_adp_arrests <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_encounters))) + 
+  geom_point(alpha = 0.5)  
+
+  plot_log_adp_encounters
+
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_encounters))) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Encounters"))
+
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_encounters))) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Encounters") + 
+      facet_wrap( ~ aor))
+```
+
+
+```{r scatterplot_removals, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# plot adp and removals
+plot_adp_removals <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_removals)) + 
+  geom_point(alpha = 0.5)
+  
+  plot_adp_removals
+  
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_removals)) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Removals"))
+  
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_removals)) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Removals") + 
+      facet_wrap( ~ aor))
+
+# plot log adp and log removals
+plot_log_adp_removals <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_removals))) + 
+  geom_point(alpha = 0.5)  
+
+  plot_log_adp_removals
+
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_removals))) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Removals"))
+
+  (ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp), y=log(n_removals))) +
+      geom_point(alpha = 0.5) + 
+      geom_smooth(method="lm") + 
+      labs(x="ADP", y="Removals") + 
+      facet_wrap( ~ aor))
+```
+
+
+#### Visualize bivariate time series
+How does ADP and number of arrests vary across time?
+
+```{r visualize_bivariate_time_series, eval=FALSE}
+#https://clanfear.github.io/CSSS508/Lectures/Week2/CSSS508_Week2_ggplot2.html#98
+
+ggplot(df_aor_adp_enforcement_long_complete, aes(x = fiscal_year, y = ..count.., group = aor)) + 
+  geom_line(aes(y = n_arrests, color = "n_arrests")) + 
+  geom_line(aes(y = adp, color = "adp")) +
+  theme_bw() + 
+  facet_wrap(~ aor) 
+```
+
+You can see a strong pattern in the data. Let’s use a model to capture that pattern and make it explicit. It’s our job to supply the basic form of the model. In this case, the relationship looks linear, i.e. y = a_0 + a_1 * x. There’s one more approach that we can use for this model, because it’s a special case of a broader family: linear models. A linear model has the general form y = a_1 + a_2 * x_1 + a_3 * x_2 + ... + a_n * x_(n - 1). So this simple model is equivalent to a general linear model where n is 2 and x_1 is x. R has a tool specifically designed for fitting linear models called lm(). lm() has a special way to specify the model family: formulas. Formulas look like y ~ x, which lm() will translate to a function like y = a_1 + a_2 * x. We can fit the model and look at the output:
+
+
+
+Patterns provide one of the most useful tools for data scientists because they reveal covariation. If you think of variation as a phenomenon that creates uncertainty, covariation is a phenomenon that reduces it. If two variables covary, you can use the values of one variable to make better predictions about the values of the second. If the covariation is due to a causal relationship (a special case), then you can use the value of one variable to control the value of the second.
+
+# Model data
+The goal of a model is to provide a simple low-dimensional summary of a dataset. In the context of this analysis, I am going to use models to partition data into patterns and residuals. Strong patterns will hide subtler trends, so I will use models to help peel back layers of structure as we explore a dataset from ICE.
+
+There are two parts to a model:
+
+First, you define a family of models that express a precise, but generic, pattern that you want to capture. For example, the pattern might be a straight line, or a quadratic curve. You will express the model family as an equation like y = a_1 * x + a_2 or y = a_1 * x ^ a_2. Here, x and y are known variables from your data, and a_1 and a_2 are parameters that can vary to capture different patterns.
+
+Next, you generate a fitted model by finding the model from the family that is the closest to your data. This takes the generic model family and makes it specific, like y = 3 * x + 7 or y = 9 * x ^ 2.
+
+## Simple linear regression 
+Simple linear regression is a technique that is appropriate to understand the association between one independent (or predictor) variable and one continuous dependent (or outcome) variable. For example, suppose we want to assess the association between total cholesterol (in milligrams per deciliter, mg/dL) and body mass index (BMI, measured as the ratio of weight in kilograms to height in meters2) where total cholesterol is the dependent variable, and BMI is the independent variable. In regression analysis, the dependent variable is denoted Y and the independent variable is denoted X. So, in this case, Y=total cholesterol and X=BMI.
+
+When there is a single continuous dependent variable and a single independent variable, the analysis is called a simple linear regression analysis. This analysis assumes that there is a linear association between the two variables. (If a different relationship is hypothesized, such as a curvilinear or exponential relationship, alternative regression analyses are performed.)
+
+The figure below is a scatter diagram illustrating the relationship between BMI and total cholesterol. Each point represents the observed (x, y) pair, in this case, BMI and the corresponding total cholesterol measured in each participant. Note that the independent variable (BMI) is on the horizontal axis and the dependent variable (Total Serum Cholesterol) on the vertical axis.
+
+
+
+The case study "SAT and College GPA" contains high school and university grades for 105 computer science majors at a local state school. We now consider how we could predict a student's university GPA if we knew his or her high school GPA.
+
+The regression equation is:
+
+University GPA' = (0.675)(High School GPA) + 1.097
+
+Therefore, a student with a high school GPA of 3 would be predicted to have a university GPA of: University GPA' = (0.675)(3) + 1.097 = 3.12.
+
+It appears that average daily population (ADP) and number of arrests in an AOR have a positive relationship. We can compute the best fitting straight line that describes this relationship with the function lm() which stands for ‘linear model’. In the code below, we call the lm() function and assign its output to a variable.
+
+The lm() function fits a line to our data that is as close as possible to all XX of our observations. More specifically, it fits the line in such a way that the sum of the squared difference between the points and the line is minimized; this method is known as “minimizing least squares.” Even when a linear regression model fits data very well, the fit isn’t perfect. The distances between our observations and their model-predicted value are called residuals.Mathematically, can we write the equation for linear regression as: Y ≈ β0 + β1X + ε
+
+The Y and X variables are the response and predictor variables from our data that we are relating to eachother
+β0 is the model coefficient that represents the model intercept, or where it crosses the y axis
+β1 is the model coefficient that represents the model slope, the number that gives information about the steepness of the line and its direction (positive or negative)
+ε is the error term that encompasses variability we cannot capture in the model (what X cannot tell us about Y)
+In the case of our example: Tree Volume ≈ Intercept + Slope(Tree Girth) + Error.
+
+The lm() function estimates the intercept and slope coefficients for the linear model that it has fit to our data. With a model in hand, we can move on to step 5, bearing in mind that we still have some work to do to validate the idea that this model is actually an appropriate fit for the data.
+
+Housing prices depend on a set of variables such as the number of bedrooms, the area it is located and so on. If you believe that housing prices depend linearly on a set of explanatory variables, you will want to estimate a linear model. To estimate a linear model, you will need to use the built-in lm() function:
+
+
+lm() takes a formula as an argument, which defines the model you want to estimate. In this case, I ran the following regression:
+
+price = β0+β1∗lotsize+β2∗bedrooms+ε
+
+where β0,β1  and  β2  are three parameters to estimate. To take a look at the results, you can use the summary() method
+
+```{r }
+#https://moderndive.com/5-regression.html
+df_aor_adp_arrests_long %>% 
+  get_correlation(log(n_arrests) ~ log(adp))
+
+```
+
+```{r }
+# https://b-rodrigues.github.io/modern_R/statistical-models.html#fitting-a-model-to-data
+
+model1 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_arrests_long)
+
+
+summary(model1)
+print(model1$coefficients)
+
+results1 <- broom::tidy(model1)
+glimpse(results1)
+results1 %>%
+  filter(p.value < 0.05)
+results1 <- broom::tidy(model1, conf.int = TRUE, conf.level = 0.95)
+
+print(results1)
+glance(model1)
+
+autoplot(model1, which = 1:6) + theme_minimal()
+
+resi1 <- residuals(model1)
+aor_aug <- augment(model1)
+glimpse(aor_aug)
+ggplot(aor_aug) +
+  geom_density(aes(.resid))
+
+fit1 <- fitted(model1)
+
+total_pos <- housing_aug %>%
+  filter(.resid > 0) %>%
+  summarise(total = n()) %>%
+  pull(total)
+
+effects_model1 <- margins(model1)
+
+summary(effects_model1)
+
+plot(effects_model1)
+effects_model1 <- summary(effects_model1)
+
+ggplot(data = effects_model1) +
+  geom_point(aes(factor, AME)) +
+  geom_errorbar(aes(x = factor, ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45))
+
+
+ggplot(df_aor_adp_arrests_long) +
+  geom_density(aes(n_arrests))
+
+model_log <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_arrests_long)
+
+result_log <- broom::tidy(model_log)
+
+print(result_log)
+
+glance(model_log)
+```
+
+#### Visualizing models
+I am going to focus on understanding a model by looking at its predictions. This has a big advantage: every type of predictive model makes predictions so we can use the same set of techniques to understand any type of predictive model.
+
+It is also useful to see what the model doesn’t capture, the so-called residuals which are left after subtracting the predictions from the data. Residuals are powerful because they allow us to use models to remove striking patterns so we can study the subtler trends that remain.
+
+http://r-statistics.co/Linear-Regression.html
+
+The log-transformation is particularly useful here because it makes the pattern linear, and linear patterns are the easiest to work with. Let’s take the next step and remove that strong linear pattern. We first make the pattern explicit by fitting a model:
+
+##### Predictions
+
+To visualise the predictions from a model, we start by generating an evenly spaced grid of values that covers the region where our data lies. The easiest way to do that is to use modelr::data_grid(). Its first argument is a data frame, and for each subsequent argument it finds the unique variables and then generates all combinations:
+
+```{r }
+#https://r4ds.had.co.nz/model-building.html#introduction-16
+ggplot(df_aor_adp_arrests_long, aes(adp, n_arrests)) + 
+  geom_hex(bins = 50)
+
+newdf <- df_aor_adp_arrests_long %>% 
+  mutate(ladp = log(adp), larrests = log(n_arrests))
+
+ggplot(newdf, aes(ladp, larrests)) + 
+  geom_hex(bins = 50)
+  
+mod1 <- lm(larrests ~ ladp, data = newdf)
+
+grid <- newdf %>% 
+  data_grid(adp = seq_range(adp, 20)) %>% 
+  mutate(ladp = log(adp)) %>% 
+  add_predictions(mod1, "larrests") %>% 
+  mutate(n_arrests = 2 ^ larrests)
+
+ggplot(newdf, aes(adp, n_arrests)) + 
+  geom_hex(bins = 50) + 
+  geom_line(data = grid, colour = "red", size = 1)
+  
+  newdf <- newdf %>% 
+  add_residuals(mod1, "lresid")
+
+ggplot(newdf, aes(ladp, lresid)) + 
+  geom_hex(bins = 50)
+```
+
+##### Residuals
+
+
+The flip-side of predictions are residuals. The predictions tells you the pattern that the model has captured, and the residuals tell you what the model has missed. The residuals are just the distances between the observed and predicted values that we computed above.
+
+We add residuals to the data with add_residuals(), which works much like add_predictions(). Note, however, that we use the original dataset, not a manufactured grid. This is because to compute residuals we need actual y values.
+
+Models are a tool for extracting patterns out of data. For example, consider the diamonds data. It’s hard to understand the relationship between cut and price, because cut and carat, and carat and price are tightly related. It’s possible to use a model to remove the very strong relationship between price and carat so we can explore the subtleties that remain. The following code fits a model that predicts price from carat and then computes the residuals (the difference between the predicted value and the actual value). The residuals give us a view of the price of the diamond, once the effect of carat has been removed.
+
+
 
   
-ggplot(newdf, aes(x=log(n_arrests))) +
-    geom_histogram(colour="black", fill="white")
-
-# plot levels
-  ggplot(newdf) + 
-    geom_histogram(mapping = aes(x = n_arrests), binwidth = 300, na.rm = TRUE)
   
-# plot adp by fiscal year across aor
-ggplot(data = newdf,
-       aes(x = fiscal_year, y = n_arrests, group = aor, color = aor)) + 
-  geom_line() +
-  xlab("Fiscal Year") +
-  ylab("Arrests") +
- # ggtitle("Average Daily Population (ADP), 2009-2018") +
-  theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  
+  
+  
+  
 
-# plot adp by fiscal year across aor facet wrap 
-ggplot(data = newdf,
-       aes(x = fiscal_year, y = n_arrests, group = aor, color = aor)) + 
-  geom_line() +
-  xlab("Fiscal Year") +
-  ylab("Arrests") +
- # ggtitle("Average Daily Population (ADP), 2009-2018") +
-  theme_bw() + 
-  facet_wrap(~ aor) + 
-  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+```{r regression_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# model regressing arrests on adp
+model1 <- lm(n_arrests ~ adp, data = df_aor_adp_arrests_long)
 
+df_aor_adp_arrests_long3 <- df_aor_adp_arrests_long %>% 
+  add_residuals(model1) %>% 
+  mutate(resid3 = exp(resid))
 
+(ggplot(data = df_aor_adp_arrests_long3) + 
+  geom_point(mapping = aes(x = adp, y = resid3)))
 
+# model regressing log arrests on log adp
+model2 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_arrests_long)
 
-# plot association between adp and arrests
-newdf %>%
-  # filter(!is.na(adp) & !is.na(n_arrests)) %>% 
-    ggplot(aes(x = adp, y = n_arrests)) +
-      geom_point() + 
-      geom_smooth()
+df_aor_adp_arrests_long2 <- df_aor_adp_arrests_long %>% 
+  add_residuals(model2) %>% 
+  mutate(resid3 = exp(resid))
 
-# plot again after removing outliers
-newdf %>%
-  filter(!is.na(adp) & !is.na(n_arrests) & adp < 5000) %>% 
-    ggplot(aes(x = adp, y = n_arrests)) +
-      geom_point(na.rm = TRUE) + 
-      geom_smooth()
+(ggplot(data = df_aor_adp_arrests_long2) + 
+  geom_point(mapping = aes(x = log(adp), y = resid3)))
 
+(ggplot(data = df_aor_adp_arrests_long2) + 
+  geom_point(mapping = aes(x = adp, y = resid3)))
 
-ggplot(newdf, aes(adp, n_arrests)) + geom_boxplot()
+https://rafalab.github.io/dsbook/linear-models.html
+
+``` 
+
+There are a few different ways to understand what the residuals tell us about the model. One way is to simply draw a frequency polygon to help us understand the spread of the residuals:
 
 
 
-# https://murraylax.org/rtutorials/regression_intro.html
 
 
-mod <- lm(log(n_arrests) ~ log(adp), data = newdf)
 
-mod$coefficients
 
-ggplot(data = newdf, mapping = aes(x = adp, y = n_arrests)) + 
+
+
+
+
+
+The first parameter we passed to the function lm() is a formula of the form y ~ x. This notation means to fit a function that has the linear form y=a+bx. The output variable growthmodel includes a lot of objects and statistical tests that describe the linear relationship between the x and y variables.
+
+\text{price} = \beta_0 + \beta_1 * \text{lotsize} + \beta_2 * \text{bedrooms} + \varepsilon
+
+We can find out what precisely what the equation of the line is by calling the coefficients variable in the growthmodel object as follows:
+
+```{r coefficients, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+summary(adp_arrests_model)
+summary(adp_arrests_log_model)
+
+adp_arrests_log_model$coefficients
+
+(ggplot(data = df_aor_adp_arrests_long, mapping = aes(x = adp, y = n_arrests)) + 
   geom_point(position = "jitter") + 
-  labs(title = "Effects of ADP on Arrests",
+  labs(title = "Effect of ADP on Arrests",
        x = "Average Daily Population",
        y = "Arrests") + 
   geom_smooth(method = "lm") + 
-  theme_bw()
+  theme_bw())
 
-newdf2 <- newdf %>%
-  add_residuals(mod) %>%
+newdf2 <- df_aor_adp_arrests_long %>%
+  add_residuals(adp_arrests_log_model) %>%
   mutate(resid = exp(resid))
 
-ggplot(data = newdf2) + 
-  geom_point(mapping = aes(x = adp, y = resid))
+(ggplot(data = newdf2) + 
+  geom_point(mapping = aes(x = adp, y = resid)))
+
+(ggplot(data = newdf2, mapping = aes(x = adp, y = resid)) +
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  theme_bw())
 ```
-The v
+
+The regression equation can be used to estimate a participant's total cholesterol as a function of his/her BMI. For example, suppose a participant has a BMI of 25. We would estimate their total cholesterol to be 28.07 + 6.49(25) = 190.32. The equation can also be used to estimate total cholesterol for other values of BMI. However, the equation should only be used to estimate cholesterol levels for persons whose BMIs are in the range of the data used to generate the regression equation. In our sample, BMI ranges from 20 to 32, thus the equation should only be used to generate estimates of total cholesterol for persons with BMI in that range.
+
+
+We can reject the null hypothesis in favor of believing there to be a relationship between tree width and volume.
 
 
 
+```{r bivariate_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# plot association between adp and arrests
+df_aor_adp_arrests_long %>%
+  #filter(!is.na(adp) & !is.na(n_arrests)) %>% 
+    ggplot(aes(x = adp, y = n_arrests)) +
+      geom_point() + 
+      geom_smooth(method = 'loess')
+
+df_aor_adp_arrests_long %>%
+  #filter(!is.na(adp) & !is.na(n_arrests)) %>% 
+    ggplot(aes(x = adp, y = n_arrests)) +
+      geom_point() + 
+      geom_smooth(method="lm")
+
+# plot again after removing outliers
+df_aor_adp_arrests_long %>%
+  filter(!is.na(adp) & !is.na(n_arrests) & adp < 5000) %>% 
+    ggplot(aes(x = adp, y = n_arrests)) +
+      geom_point(na.rm = TRUE) + 
+      geom_smooth(method = 'loess')
+
+df_aor_adp_arrests_long %>%
+  filter(!is.na(adp) & !is.na(n_arrests) & adp < 5000) %>% 
+    ggplot(aes(x = adp, y = n_arrests)) +
+      geom_point(na.rm = TRUE) + 
+      geom_smooth(method ="lm")
+
+# https://murraylax.org/rtutorials/regression_intro.html
+```
+
+Approach #1: Repeated Measures Multivariate General Linear Model (GLM)
+Approach #2: Marginal Multilevel Model
+Approach #3: Linear Mixed Model
 
 
+# Statistical models
+Statistical models attempt to summarize relationships between variables by reducing the dimensionality of the data.
 
 
+## Fit a model to data
+Housing prices depend on a set of variables such as the number of bedrooms, the area it is located and so on. If you believe that housing prices depend linearly on a set of explanatory variables, you will want to estimate a linear model. To estimate a linear model, you will need to use the built-in lm() function:
 
+```{r fit_lm, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# plot the data
+ggplot(data=df_aor_adp_arrests_long, mapping=aes(x=adp, y=n_arrests)) +
+  geom_point(alpha = 0.5) +
+  labs(title="Arrests Versus ADP",
+       x="Average Daily Population (ADP)",
+       y="Arrests") +
+  theme_bw()
 
+# estimate the regression equation
+model1 <- lm(n_arrests ~ adp, data = df_aor_adp_arrests_long)
 
+# examine estimated coefficients
+model1$coefficients
 
+# add estimated linear regression line to scatterplot
+ggplot(data=df_aor_adp_arrests_long, mapping=aes(x=adp, y=n_arrests)) +
+  geom_point(alpha = 0.5) +
+  labs(title="Arrests Versus ADP",
+       x="Average Daily Population (ADP)",
+       y="Arrests") +
+  geom_smooth(method="lm") +
+  theme_bw()
 
+# regression with log dependent variable
+model2 <- lm(log(n_arrests) ~ adp, data = df_aor_adp_arrests_long)
 
+# view summary of regression output
+summary(model2)
 
+# regression with log independent and dependent variables
+model3 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_arrests_long)
 
+# view summary of regression output
+summary(model3)
 
-
-
-
-
-
-
-# aggregate arrests to AOR and year
-arrests_df_aor <- test %>%
-  group_by(aor, year) %>% 
-  mutate(n_apprehension_method = n_distinct(apprehension_method),
-         n_apprehension_landmark = n_distinct(apprehension_landmark),
-         n_proccessing_disposition = n_distinct(processing_disposition), 
-         n_citizenship = n_distinct(citizenship),
-         n_gender = n_distinct(gender)) %>%
-  group_by(aor, year, n_apprehension_method, n_apprehension_landmark, n_proccessing_disposition, n_citizenship, n_gender) %>%
-  summarize_at(vars(contains("aor"))) %>% 
-  ungroup()
-
-
-
-# summarize number
-# aor
-# check levels
-class(df_arrests$aor)
-
-df_arrests %>%
-  count(aor)
-
-# verify unique IDs
-df_arrests %>%
-  count(aor) %>%
-  filter(n > 1) # rows are unique except for "redacted" obs (n = 207)
-                # redacted obs are type == "ORR"
-
-df_arrests %>%
-  summarise(count = n_distinct(aor)) # 1479 unique obs
-
-
-levels(as.factor(df_arrests$aor))
-"ATL" Atlanta
-"BAL" Baltimore
-"BOS" Boston
-"BUF" Buffalo
-"CHI" Chicago
-"DAL" Dallas
-"DEN" Denver
-"DET" Detroit
-"ELP" El Paso
-"HOU" Houston
-"HQ" 
-"LOS" Los Angeles Area of Responsibility: Los Angeles Metropolitan Area (Counties of Los Angeles, Orange, Riverside, San Bernardino), and Central Coast (Counties of Ventura, Santa Barbara and San Luis Obispo)
-"MIA" Miami
-"NEW" Newark
-"NOL" New Orleans
-"NYC" New York City
-"PHI" Philadelphia
-"PHO" Phoenix Area of Responsibility: Arizona
-"SEA" Seattle
-"SFR" San Francisco
-"SLC" Salt Lake City
-"SNA" San Antonio
-"SND" San Diego
-"SPM" St Paul
-"WAS" Washington (VA)
-
-
-df_arrests %>% 
-  filter(detloc != "Redacted") %>% # filter out redacted obs
-  summarise(count = n_distinct(detloc)) # 1478 unique obs
-
-# convert to factor
-df_arrests <- df %>%
-  mutate(detloc = as.factor(detloc))
-
-df_arrests %>%
-  count(aor, apprehension_date) 
-
+# That is, arrests on average are 0.67% higher for each 1% increase in average daily population (ADP). In economics, we call a measure like this an elasticity.
 
 
 ```
+lm() takes a formula as an argument, which defines the model you want to estimate. In this case, I ran the following regression:
 
+price
+=
+β
+0
++
+β
+1
+∗
+lotsize
++
+β
+2
+∗
+bedrooms
++
+ε
+ 
+
+where 
+β
+0
+,
+β
+1
+ and 
+β
+2
+ are three parameters to estimate. To take a look at the results, you can use the summary() method (not to be confused with dplyr::summarise()):
+ 
+```{r }
+
+summary(model1)
+``
+## Diagnostics
+## Compare models
+## Use a model for prediction
+
+
+# NOTES 
 With the facility-level data structured in both long and wide formats, we can start to describe univariate statistics and covariation between variables of interest using numerical summaries and graphical displays.
 
 The following analyses describes the ICE facilities dataset, which includes both continuous and categorical variables. A variable is continuous if it can take any of an infinite set of ordered values (e.g., income). There are several different plots that can effectively communicate the different features of continuous variables. Features I am generally interested in include measures of location and spread, symmetry, and outliers. In contrast, a categorical variable is a variable that can take on one of a limited, and usually fixed, number of possible values, assigning each individual or other unit of observation to a particular group or nominal category on the basis of some qualitative property (e.g., race-ethnicity, gender, citizenship). There are a few different plots that can effectively communicate features of categorical variables. The features of these variables in which I am generally interested cover counts and proportions.
 
 
-
-# Exploratory Data Analysis (EDA)
-The CMTO project collects data on the characteristics of both households and individuals within those households. This survey includes information on facility location, household composition and characteristics, and socioeconomic characteristics. First, the geographic context in which households are situated is determined. Second, households within these geographies are characterized by wealth, size, number of children, age and sex composition and structure, and expenditures on rental units. Third, individual-level indicators provide additional characteristics of household head, children, and other household members. These data on individuals are collected on variables such as race-ethnicity, gender, age, homeless status, disability status, relationship to the household head. 
-
-The analytical framework implemented in this analysis illustrates these interrelationships. This framework can be used to analyze data on households' outcomes in economic attainment, educational achievement, and access to geographic opportunity by a great many demographic, housing, and socioeconomic indicators.
-
-## Sample selection
-Two questions I will be answering in this section are:
-
-* What type of variation occurs within my variables?
-
-* What type of covariation occurs between my variables?
-
-The current anal ysis is interested in the characteristics of AORs in 2011 through 2019. For this purpose, I aggregate characteristics of facilities before recalculating summary statistics.
-
-The full sample, however, is much larger. The total number of participants and households is `r format(df.demog %>% summarise(count = n_distinct(member_ssn)), big.mark = ",")` and `r df.demog %>% summarise(count = n_distinct(entityid))`, respectively.
-
-```{r adp_by_year, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-
-# # compute rate per 10,000
-# table1 %>% 
-#   mutate(rate = cases / population * 10000)
-
-# visualize changes over time
-aor_by_year <- ggplot(data = df_aor_long, 
-       aes(x = fiscal_year, y = adp, 
-           group = aor)) +
-  geom_line() +
-  xlab("Year") + 
-  ylab("Average Daily Population") +
-  ggtitle("Average Daily Population, 2011--2019") +
-  theme_bw(base_size=8) + 
-  theme(axis.text.x = element_text(angle = 90, size = 10)) #+
- # facet_wrap(~ aor)
-
-aor_by_year
-```
 
 
 ```{r cert_type, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
@@ -1045,28 +2940,6 @@ By contrast, the data frame subsetting on issuance of vouchers has a total numbe
 I tidy these data to then facilitate their transformation and visualization. I describe univariate statistics and covariation between variables I observe for the purpose of modelling associations among immigration detention facilities, interior immigration law enforcement practices, and immigration bail bonds.
 
 
-## Summarizing and visualizing distributions
-
-It is important to be able to understand how an individual variable is distributed before moving on to more sophisticated visualizations that enable multidimensional investigation. Visually understanding the distribution allows us to describe many features of a variable.
-
-### Variation
-I first present several numerical summaries and create graphical displays showing the univariate distributions of different variables that are of interest to the Human Rights at Home project .
-
-### Covariation
-Bivariate Relationships and Associations
-Having a solid understanding of univariate distributions is important; however, most analyses want to take the next step to understand associations and relationships between variables. Features we are generally interested in include:
-
-Associations
-Outliers
-Clusters
-Gaps
-Barriers
-Change points
-
-
-
-
-
 
 
 
@@ -1105,12 +2978,6 @@ g + geom_density(aes(fill = race_ethnicity), alpha=0.8) +
 ```
 
 The distribution of age by ethnoracial affiliation is different among the sample of issued vouchers. For example, the probability that a person who identifies as multiracial is 10-years-old is much higher than in the sample of new admissions. Asian participants also appear to be older in the sample of issued vouchers when compared to the sample of new admissions. Latinos and Native Americans have similar probabilities around 10-years-old within this sample.
-
-```{r}
-#Dates confirm voucher-holding households moved-in, while issuance of vouchers suggests households are in the process of searching for rental housing. 
-
-#The duration between these dates prompts important questions related to the housing search process, residential mobility, racial equity, and social justice.
-```
 
 ```{r newadmission_hoh_single_adult_race_vis, eval=TRUE, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
 
@@ -1228,3 +3095,4 @@ I often hear concern about the non-normal distributions of independent variables
 There are NO assumptions in any linear model about the distribution of the independent variables.  Yes, you only get meaningful parameter estimates from nominal (unordered categories) or numerical (continuous or discrete) independent variables.  But no, the model makes no assumptions about them.  They do not need to be normally distributed or continuous.
 
 It is useful, however, to understand the distribution of predictor variables to find influential outliers or concentrated values.  A highly skewed independent variable may be made more symmetric with a transformation.
+
