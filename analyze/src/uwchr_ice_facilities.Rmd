@@ -411,7 +411,8 @@ df_counties <- mutate(df_counties, aor =
 "48345", 	# Motley County, Texas
 "48363", 	# Palo Pinto County, Texas
 "48365", 	# Panola County, Texas
-"48367", 	# Parker County, Texas
+"48367",	# Parker County, Texas
+"48133", # Eastland County, Texas, 
 "48369"), 	# Parmer County, Texas 
 "DAL", 
         ifelse(geoid %in% c(
@@ -432,8 +433,7 @@ df_counties <- mutate(df_counties, aor =
 "48329", 	# Midland County, Texas
 "48475", 	# Ward County, Texas
 "48103", 	# Crane County, Texas
-"48461", 	# Upton County, Texas
-"48133"), # Eastland County, Texas), 
+"48461"), 	# Upton County, Texas
 "ELP", 
         ifelse(geoid %in% c(
 "48005", 	# Angelina County, Texas
