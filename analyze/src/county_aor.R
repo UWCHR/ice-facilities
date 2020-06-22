@@ -1,9 +1,17 @@
-library(tidyverse) # easily install and load the 'Tidyverse' set of packages
+# Authors:     TM, PN
+# Maintainers: PN
+# Copyright:   2020, UWCHR, GPL v2 or later
+# =========================================
+# ice/facilities/analyze/src/county_aor.R
+
+library(tidyverse)
 library(tidycensus)
 library(tigris)
 library(sf)
+library(yaml)
+library(here)
 
-setwd('~/git/ice-facilities/analyze/src/')
+# setwd('~/git/ice-facilities/analyze/src/')
 
 # check census api key
 Sys.getenv("CENSUS_API_KEY")
@@ -324,8 +332,10 @@ df_counties <- mutate(df_counties, aor =
         ifelse(geoid %in% c("06029", "06015", "06093", "06049", "06023", "06105", "06089", "06035", "06103", "06063", "06045", "06021", "06033", "06011", "06007", "06115", "06057", "06091", "06097", "06055", "06041", "06101", "06113", "06095", "06067", "06061", "06017", "06005", "06009", "06003", "06109", "06051", "06075", "06013", "06001", "06077", "06099", "06043", "06081", "06085", "06047", "06039", "06087", "06053", "06069", "06019", "06031", "06107", "06027"), "SFR", 
         ifelse(geoid %in% c("06073", "06025"), "SND", "Fail"))))))))))))))))))))))))))))
 
-write_csv(df_counties, path = "../output/df_county_aor.csv")
-write_yaml(select(df_counties, geoid, aor), '../output/county_aor.yaml', fileEncoding = "UTF-8")
+outputfile <- here('git', 'ice-facilities', 'analyze', 'output', 'county_aor.csv')
+write_csv(df_counties, outputfile)
+outputfile <- here('git', 'ice-facilities', 'analyze', 'output', 'county_aor.yaml')
+write_yaml(select(df_counties, geoid, aor), outputfile, fileEncoding = "UTF-8")
 
 us <- counties(year = 2018, class = "sf")
 names(us) <- tolower(names(us))
