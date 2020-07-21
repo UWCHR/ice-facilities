@@ -36,7 +36,7 @@ library(shiny)
 library(DT)
 library(scales)
 library(stringr)
-library(lavaan)
+# library(lavaan)
 library(forcats)
 library(lubridate)
 library(modelr)
@@ -46,6 +46,7 @@ library(broom)
 library(ggfortify)
 library(margins)
 library(moderndive)
+library(here)
 ```
 
 ## Read data
@@ -60,29 +61,54 @@ The third data frame contains county-level demographic, social, and economic cha
 getwd() # "C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academics/Graduate School/University of Washington/Research/Projects/ICE"
 
 # set working directory
-setwd("C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academics/Graduate School/University of Washington/Research/Projects/ICE")
+# setwd("C:/Users/marqu/Google Drive/thiagm@uw.edu 2018-12-22 02_24/Academics/Graduate School/University of Washington/Research/Projects/ICE")
+
+# # load foia-ice rectangular data
+#   # read facilities data
+#   df_facilities <- ice_facilities_data <- read_delim(
+#     "C:/Users/marqu/git/ice-facilities/analyze/input/facil-list.csv.gz", 
+#     delim = "|") 
+#           
+#   # read encounters data
+#     df_encounters <- ice_encounters_data <- 
+#       read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/encounters.csv.gz", 
+#                  delim = "|")
+#     
+#   # read arrests data
+#   df_arrests <- ice_arrests_data <- 
+#       read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/arrests.csv.gz", 
+#                  delim = "|")
+#   
+#   # read removals data
+#   df_removals <- ice_removals_data <- 
+#       read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/removals.csv.gz", 
+#                  delim = "|")
 
 # load foia-ice rectangular data
   # read facilities data
-  df_facilities <- ice_facilities_data <- read_delim(
-    "C:/Users/marqu/git/ice-facilities/analyze/input/facil-list.csv.gz", 
+  df_facilities <- read_delim(
+    here('analyze', 'input', 'facil-list.csv.gz'), 
     delim = "|") 
           
   # read encounters data
-    df_encounters <- ice_encounters_data <- 
-      read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/encounters.csv.gz", 
-                 delim = "|")
+    df_encounters <- read_delim(
+      here('analyze', 'input', 'encounters.csv.gz'), 
+      delim = "|")
     
   # read arrests data
-  df_arrests <- ice_arrests_data <- 
-      read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/arrests.csv.gz", 
-                 delim = "|")
+  df_arrests <- read_delim(
+    here('analyze', 'input', 'arrests.csv.gz'),
+    delim = "|")
   
   # read removals data
-  df_removals <- ice_removals_data <- 
-      read_delim("C:/Users/marqu/git/ice-ero-lesa/us/clean/output/removals.csv.gz", 
-                 delim = "|")
+  df_removals <- read_delim(
+    here('analyze', 'input', 'removals.csv.gz'),
+    delim = "|")
   
+  aor_counties <- read_delim(
+    here('analyze', 'output', 'county_aor.csv'),
+    delim = ',')
+
 # # load mpi arrests data
 #   df_mpi_arrests <- mpi_arrests_data <- 
 #     read_delim("C:/Users/marqu/git/ice-facilities/analyze/hand/mpi_arrest_table_copy.csv", 
@@ -721,19 +747,15 @@ raw_tract_edu_df <- get_acs("tract",
 #### Data on detention facilities
 The Enforcement and Removal Operations (ERO) division within ICE deals directly with the detention of immigrants. Detention facilities are uniquely identified by a location code (i.e., `detloc`). Other geographic variables include facility name, street address, city, county, state, and ZIP code. Facilities are also located within an area of responsibility (AOR).
 
+ERO, under ICE, operates eight detention centers, termed "Service Processing Centers," in Aguadilla, Puerto Rico; Batavia, New York; El Centro, California; El Paso, Texas; Florence, Arizona; Miami, Florida; Los Fresnos, Texas; and San Pedro, California.
 
+ICE also has contracts with seven private companies that run facilities in Aurora, Colorado; Houston, Texas; Laredo, Texas; Tacoma, Washington; Elizabeth, New Jersey; Queens, New York; and San Diego, California.
 
+Other facilities that house immigrant detainees include juvenile detention centers and shelters.
 
+However, the majority of immigrants are detained in state and local jails, which have contracts with ICE. According to the list of detention sites produced by the Global Detention Project, at the end of the 2007 fiscal year, the immigration detention system of the US comprised 961 sites.
 
 ```{r check_detloc, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
-
-# ERO, under ICE, operates eight detention centers, termed "Service Processing Centers," in Aguadilla, Puerto Rico; Batavia, New York; El Centro, California; El Paso, Texas; Florence, Arizona; Miami, Florida; Los Fresnos, Texas; and San Pedro, California.
-# 
-# ICE also has contracts with seven private companies that run facilities in Aurora, Colorado; Houston, Texas; Laredo, Texas; Tacoma, Washington; Elizabeth, New Jersey; Queens, New York; and San Diego, California.
-# 
-# Other facilities that house immigrant detainees include juvenile detention centers and shelters.
-# 
-# However, the majority of immigrants are detained in state and local jails, which have contracts with ICE. According to the list of detention sites produced by the Global Detention Project, at the end of the 2007 fiscal year, the immigration detention system of the US comprised 961 sites.
 
 # detloc
 # check levels
@@ -755,6 +777,9 @@ df_facilities %>%
   filter(detloc != "Redacted") %>% # filter out redacted obs
   summarise(count = n_distinct(detloc)) # 1478 unique obs
 
+df_facilities <- df_facilities %>% 
+  filter(detloc != "Redacted")
+
 # convert to factor
 df_facilities <- df_facilities %>%
   mutate(detloc = as.factor(detloc))
@@ -764,15 +789,9 @@ df_facilities <- df_facilities %>%
 # name
 # check levels
 class(df_facilities$name)
-class(df_facilities$`name`)
-class(df_facilities$"name")
 
 df_facilities %>%
   count(name)
-df_facilities %>%
-  count(`name`)
-df_facilities %>%
-  count("name")
 
 # verify unique IDs
 df_facilities %>%
@@ -1363,7 +1382,7 @@ df_aor_arrests <- df_arrests %>%
   group_by(aor, apprehension_year) %>% 
   summarize(n_arrests = n()) %>%
   ungroup()
-#View(df_aor_arrests)
+View(df_aor_arrests)
 
 # count arrests by aor
 df_aor_arrests %>%
@@ -1411,7 +1430,7 @@ ggplot(data = df_aor_arrests,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
-ggsave("arrests_facet.pdf")
+ggsave(here("analyze", "output", "arrests_facet.pdf"))
 
 ```
 
@@ -1471,7 +1490,7 @@ ggplot(data = df_aor_encounters,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
-ggsave("encounters_facet.pdf")
+ggsave(here("analyze", "output", "encounters_facet.pdf"))
 
 
 # # plot
@@ -1551,7 +1570,7 @@ ggplot(data = df_aor_removals,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
-ggsave("removals_facet.pdf")
+ggsave(here("analyze", "output", "removals_facet.pdf"))
 
 # # plot
 # ggplot(data = df_aor_removals, aes(x = removal_year, y = n_removals, group = aor)) +
@@ -1576,6 +1595,31 @@ df_aor_adp <- df_facilities %>%
   group_by(aor) %>% 
   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
   ungroup() # 24 AORs
+
+View(df_aor_adp)
+
+df_aor_adp_pivot <- df_aor_adp %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+df_aor_adp_pivot$fy <- df_aor_adp_pivot$fy %>% str_replace_all('[aA-zZ]', '')
+
+df_aor_adp_pivot$fy <- paste('20', df_aor_adp_pivot$fy, sep='')
+
+ggplot(data = df_aor_adp_pivot,
+       aes(x = fy, y = adp, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("ADP") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  ggtitle("AOR Total ADP per Fiscal Year")
+ggsave(here("analyze", "output", "adp_facet.pdf"))
 ```
 
 ## Tidy data
