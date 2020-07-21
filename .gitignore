@@ -5,3 +5,5 @@
 analyze/output/figures/*
 *.pdf
 .DS_Store
+.Rproj.user
+*.Rproj
