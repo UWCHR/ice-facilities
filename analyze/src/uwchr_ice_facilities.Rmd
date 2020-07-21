@@ -1418,7 +1418,7 @@ ggplot(data = df_aor_arrests,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 ggsave("arrests.pdf")
 
-# plot arrests by fiscal year across aor with facet wrap 
+# plot arrests by fiscal year across aor with facet wrap  - DANGER: This is calendar year, not FY!
 ggplot(data = df_aor_arrests,
        aes(x = apprehension_year, 
            y = n_arrests, 
@@ -1430,6 +1430,7 @@ ggplot(data = df_aor_arrests,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  labs(title="ICE Arrests per Fiscal Year by AOR", caption="*FY2019 data incomplete")
 ggsave(here("analyze", "output", "arrests_facet.pdf"))
 
 ```
@@ -1481,7 +1482,7 @@ ggplot(data = df_aor_encounters,
 ggsave("encounters.pdf")
 
 
-# plot encounters by fiscal year across aor with facet wrap 
+# plot encounters by fiscal year across aor with facet wrap - DANGER: This is calendar year, not FY!
 ggplot(data = df_aor_encounters,
        aes(x = event_year, y = n_encounters, group = aor, color = aor)) + 
   geom_line() +
@@ -1490,6 +1491,7 @@ ggplot(data = df_aor_encounters,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  labs(title="ICE Encounters per Fiscal Year by AOR", caption="*FY2019 data incomplete")
 ggsave(here("analyze", "output", "encounters_facet.pdf"))
 
 
@@ -1522,7 +1524,7 @@ df_aor_removals <- df_removals %>%
   ggplot(df_aor_removals) + 
     geom_histogram(mapping = aes(x = n_removals))
 
-  # plot removals by fiscal year
+  # plot removals by fiscal year - DANGER: This is calendar year, not FY!
 ggplot(data = df_aor_removals,
        aes(x = removal_year, y = n_removals)) + 
   geom_point() +
@@ -1570,6 +1572,7 @@ ggplot(data = df_aor_removals,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  labs(title="ICE Removals per Fiscal Year by AOR", caption="*FY2019 data incomplete")
 ggsave(here("analyze", "output", "removals_facet.pdf"))
 
 # # plot
@@ -1595,31 +1598,6 @@ df_aor_adp <- df_facilities %>%
   group_by(aor) %>% 
   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
   ungroup() # 24 AORs
-
-View(df_aor_adp)
-
-df_aor_adp_pivot <- df_aor_adp %>%
-  pivot_longer(
-    cols = starts_with("fy"),
-    names_to = "fy",
-    values_to = "adp",
-    values_drop_na = TRUE
-  )
-
-df_aor_adp_pivot$fy <- df_aor_adp_pivot$fy %>% str_replace_all('[aA-zZ]', '')
-
-df_aor_adp_pivot$fy <- paste('20', df_aor_adp_pivot$fy, sep='')
-
-ggplot(data = df_aor_adp_pivot,
-       aes(x = fy, y = adp, group = aor, color = aor)) + 
-  geom_line() +
-  xlab("Fiscal Year") +
-  ylab("ADP") +
-  theme_bw() + 
-  facet_wrap(~ aor) + 
-  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
-  ggtitle("AOR Total ADP per Fiscal Year")
-ggsave(here("analyze", "output", "adp_facet.pdf"))
 ```
 
 ## Tidy data
@@ -1640,74 +1618,30 @@ There are at least three reasons for structuring data. First, software requireme
 
 #### Pivot average daily population wide to long
 ```{r pivot_adp_wide_to_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
-# pivot adp wide to long
-df_aor_adp_long <- df_aor_adp %>% 
+df_aor_adp_pivot <- df_aor_adp %>%
   pivot_longer(
     cols = starts_with("fy"),
-    names_to = "key",
-    values_to = "cases",
-  ) %>%
-  separate(key, 
-           c("fiscal_year", 
-             "adp"), 
-           sep = "_"
-           ) %>% 
-  pivot_wider(
-    names_from = c(adp), 
-    values_from = cases)
+    names_to = "fiscal_year",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
 
-# convert fiscal_year to factor
-df_aor_adp_long <- df_aor_adp_long %>%
-  mutate(fiscal_year = as.factor(fiscal_year))
-class(df_aor_adp_long$fiscal_year) 
+df_aor_adp_pivot$fiscal_year <- df_aor_adp_pivot$fiscal_year %>% str_replace_all('[aA-zZ]', '')
 
-# recode fiscal_year values
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy18'] <- '2018'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy17'] <- '2017'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy16'] <- '2016'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy15'] <- '2015'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy14'] <- '2014'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy13'] <- '2013'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy12'] <- '2012'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy11'] <- '2011'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy10'] <- '2010'
-levels(df_aor_adp_long$fiscal_year)[levels(df_aor_adp_long$fiscal_year)=='fy09'] <- '2009'
+df_aor_adp_pivot$fiscal_year <- paste('20', df_aor_adp_pivot$fiscal_year, sep='')
 
-# plot adp levels
-  ggplot(df_aor_adp_long) + 
-    geom_histogram(mapping = aes(x = adp))
-
-# plot adp by fiscal year across aor
-ggplot(data = df_aor_adp_long,
+ggplot(data = df_aor_adp_pivot,
        aes(x = fiscal_year, y = adp, group = aor, color = aor)) + 
   geom_line() +
   xlab("Fiscal Year") +
-  ylab("Average Daily Population (ADP)") + 
-  ggtitle("Average Daily Population (ADP), 2009-2018") +
-  theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
-ggsave("adp.pdf")
-
-
-# plot adp by fiscal year across aor with facet wrap 
-ggplot(data = df_aor_adp_long,
-       aes(x = fiscal_year, y = adp, group = aor, color = aor)) + 
-  geom_line() +
-  xlab("Fiscal Year") +
-  ylab("Average Daily Population (ADP)") +
- ggtitle("Average Daily Population (ADP), 2009-2018") +
+  ylab("ADP") +
   theme_bw() + 
   facet_wrap(~ aor) + 
-  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
-ggsave("adp_facets.pdf")
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="AOR Total ADP per Fiscal Year", caption="*Excluding ORR facilities")
+ggsave(here("analyze", "output", "adp_facet.pdf"))
 
-# # plot
-# ggplot(data = df_aor_adp_long, aes(x = fiscal_year, y = adp, group = aor)) +
-#   geom_line() +
-#   geom_line(stat = "smooth", method = "loess",
-#             aes(group = aor)) +
-#   facet_wrap(~ aor) +
-#   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+df_aor_adp_long <- df_aor_adp_pivot
 
 ```
 
@@ -1762,7 +1696,7 @@ df_aor_adp_enforcement_long <- data.frame(year = character(),
 df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
   full_join(df_aor_adp_long,
             by = c("aor", 
-                   c("year" = "fiscal_year"))
+                   c("year" = "fiscal_year")) #DANGER! We're joining CY and FY here, not good
             )
 df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
   full_join(df_aor_enforcement_long,
@@ -1860,6 +1794,8 @@ It is often useful to add new columns that are functions of existing columns. Th
 
 #### Changes in detention and enforcement patterns
 ```{r add_new_variables_change_1yr, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER! This differences may be based on partial yearly values, should only include full years here:
 
 # create one-year change variables in average daily population and enforcement practices
 df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>% 
@@ -2078,7 +2014,7 @@ df_aor_adp_enforcement_long_complete %>%
     ggplot(df_aor_adp_enforcement_long_complete) + 
       geom_histogram(mapping = aes(x = n_encounters), binwidth = 5000, na.rm = TRUE)
     
-    # plot encounters by fiscal year across aor
+    # plot encounters by fiscal year across aor DANGER: Enforcement measures are by calendar year
       ggplot(data = df_aor_adp_enforcement_long_complete,
            aes(x = year, y = n_encounters, group = aor, color = aor)) + 
       geom_line() +
@@ -2088,7 +2024,7 @@ df_aor_adp_enforcement_long_complete %>%
       theme_bw() + 
       theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
   
-    # plot encounters by fiscal year across aor facet wrap 
+    # plot encounters by fiscal year across aor facet wrap DANGER: Enforcement measures are by calendar year
     ggplot(data = df_aor_adp_enforcement_long_complete,
            aes(x = year, y = n_encounters, group = aor, color = aor)) + 
       geom_line() +
@@ -2133,7 +2069,7 @@ df_aor_adp_enforcement_long_complete %>%
     ggplot(df_aor_adp_enforcement_long_complete) + 
       geom_histogram(mapping = aes(x = n_arrests), binwidth = 5000, na.rm = TRUE)
     
-    # plot arrests by fiscal year across aor
+    # plot arrests by fiscal year across aor DANGER: Enforcement measures are by calendar year
       ggplot(data = df_aor_adp_enforcement_long_complete,
            aes(x = year, y = n_arrests, group = aor, color = aor)) + 
       geom_line() +
@@ -2143,7 +2079,7 @@ df_aor_adp_enforcement_long_complete %>%
       theme_bw() + 
       theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
   
-    # plot arrests by fiscal year across aor facet wrap 
+    # plot arrests by fiscal year across aor facet wrap  DANGER: Enforcement measures are by calendar year
     ggplot(data = df_aor_adp_enforcement_long_complete,
            aes(x = year, y = n_arrests, group = aor, color = aor)) + 
       geom_line() +
@@ -2187,7 +2123,7 @@ df_aor_adp_enforcement_long_complete %>%
     ggplot(df_aor_adp_enforcement_long_complete) + 
       geom_histogram(mapping = aes(x = n_removals), binwidth = 5000, na.rm = TRUE)
     
-    # plot removals by fiscal year across aor
+    # plot removals by fiscal year across aor DANGER: Enforcement measures are by calendar year
       ggplot(data = df_aor_adp_enforcement_long_complete,
            aes(x = year, y = n_removals, group = aor, color = aor)) + 
       geom_line() +
@@ -2197,7 +2133,7 @@ df_aor_adp_enforcement_long_complete %>%
       theme_bw() + 
       theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
   
-    # plot removals by fiscal year across aor facet wrap 
+    # plot removals by fiscal year across aor facet wrap  DANGER: Enforcement measures are by calendar year
     ggplot(data = df_aor_adp_enforcement_long_complete,
            aes(x = year, y = n_removals, group = aor, color = aor)) + 
       geom_line() +
@@ -2224,6 +2160,9 @@ Here we look at estimating and visualizing how two numerical variables are posit
 We will focus on the average annual growth rate of real GDP from 1960-1995 and the average number of years of schooling for adult residents in the country in 1960.
 
 ```{r estimate_correlation_adp_enforcement, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 # compute the pearson correlation coefficient
   # adp and arrests: linear-linear
   df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_arrests)) %>% pull(r)
@@ -2288,6 +2227,9 @@ Figure X shows a scatter plot of University GPA as a function of High School GPA
 Correlation is not always a good summary of the relationship between two variables. Our sample estimate for the correlation coefficient is positive, but is this enough evidence that there is a relationship between average daily population and number of arrests in the population? To answer this, let us conduct a hypothesis test with the following null and alternative hypotheses:
 
 ```{r cor_test_arrests_adp, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 # adp and arrests
   cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
            y = df_aor_adp_enforcement_long_complete$n_arrests, 
@@ -2343,6 +2285,9 @@ The visualization of choice when exploring the relationship between two continuo
 A scatterplot of average daily population (ADP) versus the number of arrests shows a pattern: more arrests are associated with larger average daily populations.
 
 ```{r scatterplot_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 # plot adp and arrests
 plot_adp_arrests <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_arrests)) + 
   geom_point(alpha = 0.5) +
@@ -2382,6 +2327,9 @@ plot_log_adp_arrests <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(a
 
 
 ```{r scatterplot_encounters, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 # plot adp and encounters
 plot_adp_encounters <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_encounters)) + 
   geom_point(alpha = 0.5)
@@ -2419,6 +2367,9 @@ plot_log_adp_encounters <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=lo
 
 
 ```{r scatterplot_removals, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 # plot adp and removals
 plot_adp_removals <- ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp, y=n_removals)) + 
   geom_point(alpha = 0.5)
@@ -2509,6 +2460,9 @@ price = β0+β1∗lotsize+β2∗bedrooms+ε
 where β0,β1  and  β2  are three parameters to estimate. To take a look at the results, you can use the summary() method
 
 ```{r }
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 #https://moderndive.com/5-regression.html
 df_aor_adp_enforcement_long_complete %>% 
   get_correlation(log(n_arrests) ~ log(adp))
@@ -2517,6 +2471,8 @@ df_aor_adp_enforcement_long_complete %>%
 
 ```{r }
 # https://b-rodrigues.github.io/modern_R/statistical-models.html#fitting-a-model-to-data
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
 
 model1 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_enforcement_long_complete)
 
@@ -2590,6 +2546,9 @@ To visualise the predictions from a model, we start by generating an evenly spac
 
 ```{r }
 #https://r4ds.had.co.nz/model-building.html#introduction-16
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 ggplot(df_aor_adp_enforcement_long_complete, aes(adp, n_arrests)) + 
   geom_hex(bins = 50)
 
@@ -2638,6 +2597,9 @@ Models are a tool for extracting patterns out of data. For example, consider the
 
 ```{r regression_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # model regressing arrests on adp
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 model1 <- lm(n_arrests ~ adp, data = df_aor_adp_arrests_long)
 
 df_aor_adp_arrests_long3 <- df_aor_adp_arrests_long %>% 
@@ -2684,6 +2646,9 @@ The first parameter we passed to the function lm() is a formula of the form y ~ 
 We can find out what precisely what the equation of the line is by calling the coefficients variable in the growthmodel object as follows:
 
 ```{r coefficients, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 summary(adp_arrests_model)
 summary(adp_arrests_log_model)
 
@@ -2718,6 +2683,9 @@ We can reject the null hypothesis in favor of believing there to be a relationsh
 
 
 ```{r bivariate_adp_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 # plot association between adp and arrests
 df_aor_adp_arrests_long %>%
   #filter(!is.na(adp) & !is.na(n_arrests)) %>% 
@@ -2760,6 +2728,9 @@ Statistical models attempt to summarize relationships between variables by reduc
 Housing prices depend on a set of variables such as the number of bedrooms, the area it is located and so on. If you believe that housing prices depend linearly on a set of explanatory variables, you will want to estimate a linear model. To estimate a linear model, you will need to use the built-in lm() function:
 
 ```{r fit_lm, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
 # plot the data
 ggplot(data=df_aor_adp_arrests_long, mapping=aes(x=adp, y=n_arrests)) +
   geom_point(alpha = 0.5) +
@@ -2833,7 +2804,7 @@ where
 ```{r }
 
 summary(model1)
-``
+```
 ## Diagnostics
 ## Compare models
 ## Use a model for prediction
