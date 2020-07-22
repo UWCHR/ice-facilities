@@ -168,6 +168,7 @@ df_removals$departed_fy <- as.integer(df_removals$departed_fy)
 
 
 ```
+
 ```{r aggregate_arrests_to_aor, echo=FALSE, results='hide', warning=FALSE, message=FALSE, include=FALSE}
 # aggregate arrests to aor
 df_aor_arrests <- df_arrests %>%
@@ -310,6 +311,8 @@ df_aor_adp_pivot$fiscal_year <- df_aor_adp_pivot$fiscal_year %>% str_replace_all
 
 df_aor_adp_pivot$fiscal_year <- paste('20', df_aor_adp_pivot$fiscal_year, sep='')
 
+df_aor_adp_pivot$fiscal_year <- as.integer(df_aor_adp_pivot$fiscal_year) 
+
 ggplot(data = df_aor_adp_pivot,
        aes(x = fiscal_year, y = adp, group = aor, color = aor)) + 
   geom_line() +
@@ -320,4 +323,128 @@ ggplot(data = df_aor_adp_pivot,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="AOR Total ADP per Fiscal Year", caption="*Excluding ORR facilities")
 ggsave(here("analyze", "output", "adp_facet.pdf"))
+```
+
+```{r join_df_aor_enforcement_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# create empty data frame
+df_aor_enforcement_long <- data.frame(fy = integer(),
+                 aor = character(), 
+                 stringsAsFactors = FALSE)
+
+# join aor-level encounters data
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  full_join(df_aor_encounters, 
+            by = c("aor", 
+                   c("fy" = "event_fy"))
+            )
+# join aor-level arrests data
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  full_join(df_aor_arrests, 
+            by = c("aor", 
+                   c("fy" = "apprehension_fy"))
+            )
+# join aor-level removals data
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  full_join(df_aor_removals, 
+            by = c("aor", 
+                   c("fy" = "removal_fy"))
+            )
+
+# recode NA values
+# These are dropped for now
+df_aor_enforcement_long <- df_aor_enforcement_long %>% 
+  mutate(aor = replace_na(aor, "UNKNOWN"))
+```
+
+```{r join_df_aor_detention_enforcement_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# create empty data frame
+df_aor_adp_enforcement_long <- data.frame(fy = integer(),
+                 aor = character(), 
+                 stringsAsFactors = FALSE)
+
+# join adp and enforcement data
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+  full_join(df_aor_adp_pivot,
+            by = c("aor", 
+                   c("fy" = "fiscal_year"))
+            )
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+  full_join(df_aor_enforcement_long,
+            by = c("aor", "fy")
+            ) %>%
+    arrange(aor, fy, adp)
+
+
+# convert to factor
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
+  mutate(aor = as.factor(aor), 
+         fy = as.factor(fy)
+         )
+```
+
+```{r add_new_variables_change_1yr, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# To do: double check this process, filter charts for missing years
+
+# create one-fy change variables in average daily population and enforcement practices
+df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>% 
+  group_by(aor) %>% 
+   # levels
+  mutate(
+    diff_adp = adp - lag(adp),
+    diff_n_encounters = n_encounters - lag(n_encounters), 
+    diff_n_arrests = n_arrests - lag(n_arrests),
+    diff_n_removals = n_removals - lag(n_removals),
+    # percents
+    pct_diff_adp = (diff_adp / lag(adp) * 100),
+    pct_diff_encounters = (diff_n_encounters / lag(n_encounters) * 100),
+    pct_diff_arrests = (diff_n_arrests / lag(n_arrests) * 100),
+    pct_diff_removals = (diff_n_removals / lag(n_removals) * 100)
+    ) %>%
+  ungroup()
+
+# plot percent change in adp by fy across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = fy, y = pct_diff_adp, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Percent Change in Average Daily Population (ADP)") + 
+  ggtitle("Percent Change in Average Daily Population (ADP), 2009-2018") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("adp_over_time.pdf")
+
+# plot percent change in encounters by fy across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = fy, y = pct_diff_encounters, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("FY") +
+  ylab("Percent Change in Encounters") + 
+  ggtitle("Percent Change in Encounters, 2015-2019") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("encounters_over_time.pdf")
+
+# plot percent change in arrests by year across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = fy, y = pct_diff_arrests, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("FY") +
+  ylab("Percent Change in Arrests") + 
+  ggtitle("Percent Change in Arrests, 2015-2019") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("arrests_over_time.pdf")
+
+# plot percent change in removals by year across aor
+ggplot(data = df_aor_adp_enforcement_long,
+       aes(x = fy, y = pct_diff_removals, group = aor, color = aor)) + 
+  geom_line() +
+  xlab("FY") +
+  ylab("Percent Change in Removals") + 
+  ggtitle("Percent Change in Removals, 2015-2019") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+ggsave("removals_over_time.pdf")
+
 ```
