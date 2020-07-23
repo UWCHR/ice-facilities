@@ -53,7 +53,7 @@ if __name__ == "__main__":
             df.loc[:, col] = df.loc[:, col].str.replace(',', '')
             df.loc[:, col] = df.loc[:, col].str.replace('$', '')
             df.loc[:, col] = df.loc[:, col].str.replace('%', '')
-            df.loc[:, col] = df.loc[:, col].astype(int)
+            df.loc[:, col] = df.loc[:, col].astype(float)
         except ValueError:
             pass
 
