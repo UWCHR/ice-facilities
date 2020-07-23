@@ -484,10 +484,29 @@ df_aor_adp_enforcement_long_complete <- df_aor_adp_enforcement_long %>%
          !is.na(n_arrests),     # remove missing arrests
          !is.na(n_removals))    # remove missing removals
 
+df_aor_adp_change_complete <- df_aor_adp_enforcement_long %>% 
+  select(c('fy', 'aor', starts_with('pct_diff'))) %>% 
+  filter(!is.na(pct_diff_adp),
+         !is.na(pct_diff_arrests),
+         !is.na(pct_diff_encounters),
+         !is.na(pct_diff_removals))
+
 # skim summary statistics
 df_aor_adp_enforcement_long_complete %>%
  select(adp, n_encounters, n_arrests, n_removals) %>%
  skim() # skewed right
+
+df_aor_adp_change_complete %>% 
+  ggplot(aes(x = pct_diff_adp, y = pct_diff_arrests, colour=aor)) +
+  geom_point()
+
+df_aor_adp_change_complete %>% 
+  ggplot(aes(x = pct_diff_adp, y = pct_diff_encounters, colour=aor)) +
+  geom_point()
+
+df_aor_adp_change_complete %>% 
+  ggplot(aes(x = pct_diff_adp, y = pct_diff_removals, colour=aor)) +
+  geom_point()
 ```
 
 ```{r summarize_visualize_distributions_adp, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
@@ -653,12 +672,31 @@ cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)),
          y = (log(df_aor_adp_enforcement_long_complete$n_removals)), 
          alternative="two.sided", conf.level=0.95, method='pearson') 
     # p-value < 2.2e-16
+
+# pct_diff
+
+cor.test(x = (log(df_aor_adp_change_complete$pct_diff_adp)), 
+         y = (log(df_aor_adp_change_complete$pct_diff_removals)), 
+         alternative="two.sided", conf.level=0.95, method='pearson')
+  # cor 0.6042734 
+  # p-value = 0.0008436
+
+cor.test(x = (log(df_aor_adp_change_complete$pct_diff_adp)), 
+         y = (log(df_aor_adp_change_complete$pct_diff_arrests)), 
+         alternative="two.sided", conf.level=0.95, method='pearson')
+  # cor 0.3529618
+  # p-value = 0.05572
+
+cor.test(x = (log(df_aor_adp_change_complete$pct_diff_adp)), 
+         y = (log(df_aor_adp_change_complete$pct_diff_encounters)), 
+         alternative="two.sided", conf.level=0.95, method='pearson')
+  # cor -0.01120545 
+  # p-value = 0.9626
+
 ```
 
 ```{r }
 # https://b-rodrigues.github.io/modern_R/statistical-models.html#fitting-a-model-to-data
-
-# DANGER: Enforcement measures are by calendar year, facility measures by FY
 
 model1 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_enforcement_long_complete)
 
