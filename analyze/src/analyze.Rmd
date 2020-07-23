@@ -9,6 +9,10 @@ output: html_document
 library(here)
 library(tidyverse)
 library(lubridate)
+library(skimr)
+library(ggrepel)
+library(broom)
+library(margins)
 
 ```
 
@@ -325,6 +329,21 @@ ggplot(data = df_aor_adp_pivot,
 ggsave(here("analyze", "output", "adp_facet.pdf"))
 ```
 
+```{r, adp_arrest_totals}
+
+df_aor_adp_pivot %>% 
+  group_by(fiscal_year) %>% 
+  summarise(adp = sum(adp)) %>% 
+  ggplot(aes(x = fiscal_year, y = adp)) + 
+  geom_line()
+
+df_aor_arrests %>% 
+  group_by(apprehension_fy) %>% 
+  summarise(n_arrests = sum(n_arrests)) %>% 
+  ggplot(aes(x = apprehension_fy, y = n_arrests)) + 
+  geom_line()
+```
+
 ```{r join_df_aor_enforcement_long, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # create empty data frame
 df_aor_enforcement_long <- data.frame(fy = integer(),
@@ -378,7 +397,7 @@ df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
 # convert to factor
 df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
   mutate(aor = as.factor(aor), 
-         fy = as.factor(fy)
+         fy = as.factor(fy),
          )
 ```
 
@@ -408,7 +427,7 @@ df_aor_adp_enforcement_long %>%
   geom_line() +
   xlab("Fiscal Year") +
   ylab("Percent Change in Average Daily Population (ADP)") + 
-  ggtitle("Percent Change in Average Daily Population (ADP), 2009-2018") +
+  ggtitle("Percent Change in Average Daily Population (ADP), FY2010-FY2018") +
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
@@ -456,4 +475,244 @@ df_aor_adp_enforcement_long %>%
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 ggsave(here("analyze", "output", "removals_over_time.pdf"))
 
+```
+
+```{r }
+df_aor_adp_enforcement_long_complete <- df_aor_adp_enforcement_long %>%
+  filter(!is.na(adp),           # remove missing adp
+         !is.na(n_encounters),  # remove missing encounters
+         !is.na(n_arrests),     # remove missing arrests
+         !is.na(n_removals))    # remove missing removals
+
+# skim summary statistics
+df_aor_adp_enforcement_long_complete %>%
+ select(adp, n_encounters, n_arrests, n_removals) %>%
+ skim() # skewed right
+```
+
+```{r summarize_visualize_distributions_adp, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# calculate summary statistics
+  summary(df_aor_adp_enforcement_long_complete$adp)
+
+# visualize distribution
+  df_aor_adp_enforcement_long_complete %>% 
+    ggplot(aes(adp)) +
+    geom_density(fill="midnightblue")
+
+   # visualize distributions for adp
+      # plot density curve for adp
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x = adp)) + geom_density() # skewed right
+      # plot density curve for log adp
+      ggplot(df_aor_adp_enforcement_long_complete, aes(x = log(adp))) + geom_density() # lightly bimodal
+  
+      # plot histogram/bar graph for adp
+        # count
+        ggplot(df_aor_adp_enforcement_long_complete, aes(x=adp)) +
+          geom_histogram(colour="black", fill="white")
+        # count log transformation
+        ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(adp))) +
+            geom_histogram(colour="black", fill="white")
+```
+
+```{r summarize_visualize_distributions_arrests, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# calculate summary statistics
+  summary(df_aor_adp_enforcement_long_complete$n_arrests)
+  
+# visualize distributions for arrests
+# plot density curve for arrests
+ggplot(df_aor_adp_enforcement_long_complete, aes(x = n_arrests, label = aor)) + geom_density() # skewed right
+# plot density curve for log arrests
+ggplot(df_aor_adp_enforcement_long_complete, aes(x = log(n_arrests), label = aor)) + geom_density() # light bimodal
+
+# plot histogram/bar graph for arrests
+# count
+ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_arrests), label = aor) + 
+  geom_histogram(colour="black", fill="white")
+# count with larger bins
+ggplot(df_aor_adp_enforcement_long_complete, aes(x=n_arrests), label = aor) + 
+  geom_histogram(colour="black", fill="white", binwidth = 5000, na.rm = TRUE)
+# count log transformation
+ggplot(df_aor_adp_enforcement_long_complete, aes(x=log(n_arrests))) +
+  geom_histogram(colour="black", fill="white")
+
+```
+
+The following test correlation between ADP and enforcement variables using various methods. How to decide whether log or linear methods better? However, in every case we see strongest correlation between ADP & removals, followed by arrests, encounters, as seen in the scatter plots. It is logical that AORs doing more deportations would have higher ADPs.
+
+```{r estimate_correlation_adp_enforcement, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# compute the pearson correlation coefficient
+  # adp and arrests: linear-linear
+  df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_arrests)) %>% pull(r)
+    # 0.4776379
+  # adp and encounters: linear-linear
+  df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_encounters)) %>% pull(r)
+    # 0.2602638
+    # adp and removals: linear-linear
+  df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_removals)) %>% pull(r)
+    # 0.8566064
+  
+      # cor(x = df_aor_adp_enforcement_long_complete$adp,
+      #     y = df_aor_adp_enforcement_long_complete$n_arrests,
+      #     method = 'pearson')
+
+
+  # adp and arrests: log-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_arrests))) %>% pull(r)
+    # 0.604332
+  # adp and encounters: log-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_encounters))) %>% pull(r)
+    # 0.3823452
+  # adp and removals: log-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_removals))) %>% pull(r)
+    # 0.8554676
+            
+
+  # adp and arrests: linear-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_arrests))) %>% pull(r)
+    # 0.5094287
+  # adp and encounters: linear-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_encounters))) %>% pull(r)
+    # 0.2887579
+  # adp and removals: linear-log
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_removals))) %>% pull(r)
+    # 0.7982713
+    
+    
+  # adp and arrests: log-linear
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_arrests)) %>% pull(r)
+    # 0.541137
+      # adp and encounters: log-linear
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_encounters)) %>% pull(r)
+    # 0.3595946
+      # adp and removals: log-linear
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_removals)) %>% pull(r)
+    # 0.7127637
+    
+  # adp and arrests: log2-log2
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_arrests))) %>% pull(r)
+    # 0.604332
+  # adp and encounters: log2-log2
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_encounters))) %>% pull(r)
+    # 0.3823452
+  # adp and removals: log2-log2
+    df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_removals))) %>% pull(r)
+    # 0.8554676
+    
+df_aor_adp_enforcement_long_complete %>% 
+  ggplot(aes(x = log(adp), y = log(n_removals), colour=aor)) +
+  geom_point()
+    
+df_aor_adp_enforcement_long_complete %>% 
+  ggplot(aes(x = log(adp), y = log(n_arrests), colour=aor)) +
+  geom_point()
+
+df_aor_adp_enforcement_long_complete %>% 
+  ggplot(aes(x = log(adp), y = log(n_encounters), colour=aor)) +
+  geom_point()
+```
+
+All correlations statistically significant: ADP-removals most significant, followd by ADP-arrests, ADP-encounters.
+
+```{r cor_test_arrests_adp, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+# adp and arrests
+  cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
+           y = df_aor_adp_enforcement_long_complete$n_arrests, 
+           alternative="two.sided", conf.level=0.95, method='pearson')
+    # p-value = 2.209e-05
+
+# log-log transformation
+cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
+         y = (log(df_aor_adp_enforcement_long_complete$n_arrests)), 
+         alternative="two.sided", conf.level=0.95, method='pearson') 
+    # p-value = 1.899e-08
+
+
+# adp and encounters
+  cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
+           y = df_aor_adp_enforcement_long_complete$n_encounters, 
+           alternative="two.sided", conf.level=0.95, method='pearson')
+    # p-value = 0.02725
+
+# log-log transformation
+cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
+         y = (log(df_aor_adp_enforcement_long_complete$n_encounters)), 
+         alternative="two.sided", conf.level=0.95, method='pearson') 
+    # p-value = 0.0009183
+
+
+# adp and removals
+  cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
+           y = df_aor_adp_enforcement_long_complete$n_removals, 
+           alternative="two.sided", conf.level=0.95, method='pearson')
+    #  p-value < 2.2e-16
+
+# log-log transformation
+cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
+         y = (log(df_aor_adp_enforcement_long_complete$n_removals)), 
+         alternative="two.sided", conf.level=0.95, method='pearson') 
+    # p-value < 2.2e-16
+```
+
+```{r }
+# https://b-rodrigues.github.io/modern_R/statistical-models.html#fitting-a-model-to-data
+
+# DANGER: Enforcement measures are by calendar year, facility measures by FY
+
+model1 <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_enforcement_long_complete)
+
+
+summary(model1)
+print(model1$coefficients)
+
+results1 <- broom::tidy(model1)
+glimpse(results1)
+results1 %>%
+  filter(p.value < 0.05)
+results1 <- broom::tidy(model1, conf.int = TRUE, conf.level = 0.95)
+
+print(results1)
+broom::glance(model1)
+
+# autoplot(model1, which = 1:6) + theme_minimal()
+
+resi1 <- residuals(model1)
+aor_aug <- augment(model1)
+glimpse(aor_aug)
+ggplot(aor_aug) +
+  geom_density(aes(.resid))
+
+fit1 <- fitted(model1)
+
+total_pos <- aor_aug %>%
+  filter(.resid > 0) %>%
+  summarise(total = n()) %>%
+  pull(total)
+
+effects_model1 <- margins(model1)
+
+summary(effects_model1)
+
+plot(effects_model1)
+effects_model1 <- summary(effects_model1)
+
+ggplot(data = effects_model1) +
+  geom_point(aes(factor, AME)) +
+  geom_errorbar(aes(x = factor, ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45))
+
+
+ggplot(df_aor_adp_enforcement_long_complete) +
+  geom_density(aes(n_arrests))
+
+model_log <- lm(log(n_arrests) ~ log(adp), data = df_aor_adp_enforcement_long_complete)
+
+result_log <- broom::tidy(model_log)
+
+print(result_log)
+
+glance(model_log)
 ```
