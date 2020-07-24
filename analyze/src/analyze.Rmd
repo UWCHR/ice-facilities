@@ -21,6 +21,10 @@ library(margins)
 df_facilities <- read_delim(
   here('analyze', 'input', 'facil-list.csv.gz'), 
   delim = "|") 
+
+df_dmcp <- read_delim(
+  here('analyze', 'input', 'dmcp-detailed.csv.gz'),
+  delim = "|")
           
 df_encounters <- read_delim(
   here('analyze', 'input', 'encounters.csv.gz'), 
@@ -44,8 +48,16 @@ aor_counties <- read_delim(
 ```{r facil_data_setup_and_filter, message=FALSE, warning=FALSE}
 
 # Dropping ORR facilities
+# df_facilities <- df_facilities %>% 
+  # filter(type != "ORR")
+
+df_dmcp$over_under_72 <- as.factor(df_dmcp$over_under_72)
+
+df_dmcp <- df_dmcp %>% 
+  filter(over_under_72 == "Over 72")
+
 df_facilities <- df_facilities %>% 
-  filter(type != "ORR")
+  filter(detloc %in% df_dmcp$detloc)
 
 # Testing that no other facilties are redacted
 stopifnot(sum(df_facilities$detloc == 'Redacted') == 0)
@@ -325,7 +337,7 @@ ggplot(data = df_aor_adp_pivot,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
-  labs(title="AOR Total ADP per Fiscal Year", caption="*Excluding ORR facilities")
+  labs(title="AOR Total ADP per Fiscal Year", caption="*Over 72-hour authorized DMCP facilities only")
 ggsave(here("analyze", "output", "adp_facet.pdf"))
 ```
 
@@ -403,6 +415,8 @@ df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>%
 
 ```{r add_new_variables_change_1yr, eval=FALSE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 
+df_aor_adp_enforcement_long[df_aor_adp_enforcement_long == 0] <- NA
+
 # create one-fy change variables in average daily population and enforcement practices
 df_aor_adp_enforcement_long <- df_aor_adp_enforcement_long %>% 
   group_by(aor) %>% 
@@ -427,10 +441,12 @@ df_aor_adp_enforcement_long %>%
   geom_line() +
   xlab("Fiscal Year") +
   ylab("Percent Change in Average Daily Population (ADP)") + 
-  ggtitle("Percent Change in Average Daily Population (ADP), FY2010-FY2018") +
+  ylim(-100, 100) +
   theme_bw() + 
   facet_wrap(~ aor) + 
-  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Percent Change in Average Daily Population (ADP), FY2010-FY2018",
+       caption="*Over 72-hour authorized DMCP facilities only")
 ggsave(here("analyze", "output", "adp_over_time.pdf"))
 
 # plot percent change in encounters by fy across aor
@@ -563,13 +579,16 @@ The following test correlation between ADP and enforcement variables using vario
 # compute the pearson correlation coefficient
   # adp and arrests: linear-linear
   df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_arrests)) %>% pull(r)
-    # 0.4776379
+    # (all facilities) 0.4776379 
+    # (DMCP >72) 0.5177671 
   # adp and encounters: linear-linear
   df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_encounters)) %>% pull(r)
-    # 0.2602638
+    # (all facilities) 0.2602638
+    # (DMCP >72) 0.3105438
     # adp and removals: linear-linear
   df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, n_removals)) %>% pull(r)
-    # 0.8566064
+    # (all facilities) 0.8566064
+    # (DMCP >72) 0.7580026
   
       # cor(x = df_aor_adp_enforcement_long_complete$adp,
       #     y = df_aor_adp_enforcement_long_complete$n_arrests,
@@ -578,45 +597,57 @@ The following test correlation between ADP and enforcement variables using vario
 
   # adp and arrests: log-log
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_arrests))) %>% pull(r)
-    # 0.604332
+    # (all facilities) 0.604332
+    # (DMCP >72) 0.5538412
   # adp and encounters: log-log
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_encounters))) %>% pull(r)
-    # 0.3823452
+    # (all facilities) 0.3823452
+    # (DMCP >72) 0.3539863
   # adp and removals: log-log
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), log(n_removals))) %>% pull(r)
-    # 0.8554676
+    # (all facilities) 0.8554676
+    # (DMCP >72) 0.8059589
             
 
   # adp and arrests: linear-log
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_arrests))) %>% pull(r)
-    # 0.5094287
+    # (all facilities) 0.5094287
+    # (DMCP >72) 0.5419437
   # adp and encounters: linear-log
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_encounters))) %>% pull(r)
-    # 0.2887579
+    # (all facilities) 0.2887579
+    # (DMCP >72) 0.314883
   # adp and removals: linear-log
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(adp, log(n_removals))) %>% pull(r)
-    # 0.7982713
+    # (all facilities) 0.7982713
+    # (DMCP >72) 0.8176056
     
     
   # adp and arrests: log-linear
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_arrests)) %>% pull(r)
-    # 0.541137
+    # (all facilities) 0.541137
+    # (DMCP >72) 
       # adp and encounters: log-linear
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_encounters)) %>% pull(r)
-    # 0.3595946
+    # (all facilities) 0.3595946
+    # (DMCP >72) 0.4996742
       # adp and removals: log-linear
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log(adp), n_removals)) %>% pull(r)
-    # 0.7127637
+    # (all facilities) 0.7127637
+    # (DMCP >72) 0.6345875
     
   # adp and arrests: log2-log2
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_arrests))) %>% pull(r)
-    # 0.604332
+    # (all facilities) 0.604332
+    # (DMCP >72) 0.5538412
   # adp and encounters: log2-log2
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_encounters))) %>% pull(r)
-    # 0.3823452
+    # (all facilities) 0.3823452
+    # (DMCP >72) 0.3539863
   # adp and removals: log2-log2
     df_aor_adp_enforcement_long_complete %>% summarize(r = cor(log2(adp), log2(n_removals))) %>% pull(r)
-    # 0.8554676
+    # (all facilities) 0.8554676
+    # (DMCP >72) 0.8059589
     
 df_aor_adp_enforcement_long_complete %>% 
   ggplot(aes(x = log(adp), y = log(n_removals), colour=aor)) +
@@ -639,60 +670,69 @@ All correlations statistically significant: ADP-removals most significant, follo
   cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
            y = df_aor_adp_enforcement_long_complete$n_arrests, 
            alternative="two.sided", conf.level=0.95, method='pearson')
-    # p-value = 2.209e-05
+    # (all facilities) p-value = 2.209e-05
+    # (DMCP >72) p-value = 3.197e-06
 
 # log-log transformation
 cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
          y = (log(df_aor_adp_enforcement_long_complete$n_arrests)), 
          alternative="two.sided", conf.level=0.95, method='pearson') 
-    # p-value = 1.899e-08
+    # (all facilities) p-value = 1.899e-08
+    # (DMCP >72) p-value = 4.499e-07
 
 
 # adp and encounters
   cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
            y = df_aor_adp_enforcement_long_complete$n_encounters, 
            alternative="two.sided", conf.level=0.95, method='pearson')
-    # p-value = 0.02725
+    # (all facilities) p-value = 0.02725
+    # (DMCP >72) p-value = 0.007933
 
 # log-log transformation
 cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
          y = (log(df_aor_adp_enforcement_long_complete$n_encounters)), 
          alternative="two.sided", conf.level=0.95, method='pearson') 
-    # p-value = 0.0009183
-
+    # (all facilities) p-value = 0.0009183
+    # (DMCP >72) p-value = 0.002284
 
 # adp and removals
   cor.test(x = df_aor_adp_enforcement_long_complete$adp, 
            y = df_aor_adp_enforcement_long_complete$n_removals, 
            alternative="two.sided", conf.level=0.95, method='pearson')
-    #  p-value < 2.2e-16
+    # (all facilities)  p-value < 2.2e-16
 
 # log-log transformation
 cor.test(x = (log(df_aor_adp_enforcement_long_complete$adp)), 
          y = (log(df_aor_adp_enforcement_long_complete$n_removals)), 
          alternative="two.sided", conf.level=0.95, method='pearson') 
-    # p-value < 2.2e-16
+    # (all facilities) p-value < 2.2e-16
+    # (DMCP >72) p-value < 2.2e-16
+
 
 # pct_diff
 
 cor.test(x = (log(df_aor_adp_change_complete$pct_diff_adp)), 
          y = (log(df_aor_adp_change_complete$pct_diff_removals)), 
          alternative="two.sided", conf.level=0.95, method='pearson')
-  # cor 0.6042734 
-  # p-value = 0.0008436
-
+  # (all facilities) cor 0.6042734 
+  # (all facilities) p-value = 0.0008436
+  # (DMCP >72) cor 0.3779104 
+  # (DMCP >72) p-value = 0.04325
 cor.test(x = (log(df_aor_adp_change_complete$pct_diff_adp)), 
          y = (log(df_aor_adp_change_complete$pct_diff_arrests)), 
          alternative="two.sided", conf.level=0.95, method='pearson')
-  # cor 0.3529618
-  # p-value = 0.05572
+  # (all facilities) cor 0.3529618
+  # (all facilities) p-value = 0.05572
+  # (DMCP >72) cor 0.224196 
+  # (DMCP >72) p-value = 0.2174
 
 cor.test(x = (log(df_aor_adp_change_complete$pct_diff_adp)), 
          y = (log(df_aor_adp_change_complete$pct_diff_encounters)), 
          alternative="two.sided", conf.level=0.95, method='pearson')
-  # cor -0.01120545 
-  # p-value = 0.9626
-
+  # (all facilities) cor -0.01120545 
+  # (all facilities) p-value = 0.9626
+  # (DMCP >72) cor -0.05257015 
+  # (DMCP >72) p-value = 0.8117
 ```
 
 ```{r }
@@ -754,3 +794,88 @@ print(result_log)
 
 glance(model_log)
 ```
+
+```{r}
+
+df_aor_adp_monthly <- df_facilities %>%
+  select(c(aor, november_2016), ends_with("_2017")) %>% 
+  group_by(aor) %>% 
+  summarize_at(vars(november_2016, ends_with("_2017")), sum) %>%
+  ungroup() # 24 AORs
+
+df_aor_adp_monthly <- df_aor_adp_monthly %>%
+  pivot_longer(
+    cols = c(november_2016, ends_with(("_2017"))),
+    names_to = "month",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+df_aor_adp_monthly <- df_aor_adp_monthly %>% 
+  separate(month, c('month', 'year'), '_')
+
+df_aor_adp_monthly$month <- Hmisc::capitalize(df_aor_adp_monthly$month)
+
+df_aor_adp_monthly$month <- match(df_aor_adp_monthly$month, month.name)
+
+df_aor_arrests_monthly <- df_arrests %>% 
+  group_by(aor, apprehension_year, apprehension_month) %>% 
+  summarize(n_arrests = n(), .groups="keep") %>%
+  ungroup()
+
+df_aor_arrests_monthly$apprehension_year <-
+  as.integer(df_aor_arrests_monthly$apprehension_year)
+
+df_aor_arrests_monthly$apprehension_month <-
+  as.integer(df_aor_arrests_monthly$apprehension_month)
+
+df_aor_adp_monthly$month <-
+  as.integer(df_aor_adp_monthly$month)
+
+df_aor_adp_monthly$year <-
+  as.integer(df_aor_adp_monthly$year)
+
+df_aor_adp_arrests_monthly <-
+  full_join(df_aor_adp_monthly,
+            df_aor_arrests_monthly,
+            by=c('aor' = 'aor',
+                 'year' = 'apprehension_year',
+                 'month' = 'apprehension_month'))
+
+df_aor_adp_arrests_monthly <- df_aor_adp_arrests_monthly %>% 
+  filter(!is.na(adp),
+         !is.na(n_arrests))
+
+df_aor_adp_arrests_monthly %>% 
+  ggplot(aes(x = adp, y = n_arrests, colour=aor)) +
+  geom_point()
+
+ df_aor_adp_arrests_monthly %>% summarize(r = cor(adp, n_arrests)) %>% pull(r)
+ 
+ df_aor_adp_arrests_monthly <- df_aor_adp_arrests_monthly %>% 
+  group_by(aor) %>% 
+   # levels
+  mutate(
+    diff_adp = adp - lag(adp),
+    # diff_n_encounters = n_encounters - lag(n_encounters), 
+    diff_n_arrests = n_arrests - lag(n_arrests),
+    # diff_n_removals = n_removals - lag(n_removals),
+    # percents
+    pct_diff_adp = (diff_adp / lag(adp) * 100),
+    # pct_diff_encounters = (diff_n_encounters / lag(n_encounters) * 100),
+    pct_diff_arrests = (diff_n_arrests / lag(n_arrests) * 100)
+    # pct_diff_removals = (diff_n_removals / lag(n_removals) * 100)
+    ) %>%
+  ungroup()
+
+df_aor_adp_arrests_monthly %>% 
+  ggplot(aes(x = pct_diff_adp, y = pct_diff_arrests, colour=aor)) +
+  geom_point() 
+
+df_aor_adp_arrests_monthly %>% 
+  filter(!is.na(pct_diff_adp),
+         !is.na(pct_diff_arrests)) %>% 
+  summarize(r = cor(pct_diff_adp, pct_diff_arrests)) %>% pull(r)
+
+```
+
