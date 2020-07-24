@@ -51,13 +51,26 @@ aor_counties <- read_delim(
 # df_facilities <- df_facilities %>% 
   # filter(type != "ORR")
 
+df_dmcp <- df_dmcp %>%
+  mutate(state = as.factor(state))
+
+df_dmcp <- df_dmcp %>%
+  mutate(aor = as.factor(aor))
+
 df_dmcp$over_under_72 <- as.factor(df_dmcp$over_under_72)
 
 df_dmcp <- df_dmcp %>% 
   filter(over_under_72 == "Over 72")
 
+df_dmcp_as_needed <- df_dmcp %>% 
+  filter(capacity == "AS NEEDED")
+
 df_facilities <- df_facilities %>% 
   filter(detloc %in% df_dmcp$detloc)
+
+df_facilities %>% 
+  filter(detloc %in% df_dmcp_as_needed$detloc ) %>% 
+  summary()
 
 # Testing that no other facilties are redacted
 stopifnot(sum(df_facilities$detloc == 'Redacted') == 0)
@@ -88,6 +101,7 @@ df_facilities <- df_facilities %>%
   mutate(type = as.factor(type))
 
 ```
+
 
 ```{r enforcement_data_setup}
 
@@ -441,7 +455,8 @@ df_aor_adp_enforcement_long %>%
   geom_line() +
   xlab("Fiscal Year") +
   ylab("Percent Change in Average Daily Population (ADP)") + 
-  ylim(-100, 100) +
+  coord_cartesian(ylim = c(-150, 150)) +
+  # ylim(-100, 100) +
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
