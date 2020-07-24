@@ -20,6 +20,7 @@ def _get_args():
     parser.add_argument("--cleanrules", required=True)
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--header", required=True)
     return parser.parse_args()
 
 
@@ -31,7 +32,7 @@ if __name__ == "__main__":
                      'quotechar': '"',
                      'compression': 'gzip',
                      'encoding': 'utf-8',
-                     'header': 8}
+                     'header': int(args.header)}
 
     df = pd.read_csv(args.input, **read_csv_opts)
 
