@@ -7,6 +7,8 @@
 #
 #
 
+proot := $(shell git rev-parse --show-toplevel)
+
 all: \
 	output/facil-list.csv.gz \
 	output/dmcp-detailed.csv.gz
