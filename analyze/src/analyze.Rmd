@@ -13,6 +13,8 @@ library(skimr)
 library(ggrepel)
 library(broom)
 library(margins)
+library(purrr)
+library(ggpubr)
 
 ```
 
@@ -892,5 +894,154 @@ df_aor_adp_arrests_monthly %>%
          !is.na(pct_diff_arrests)) %>% 
   summarize(r = cor(pct_diff_adp, pct_diff_arrests)) %>% pull(r)
 
+```
+```{r}
+
+nwdc <- df_facilities %>% 
+  filter(detloc == 'CSCNWWA')
+
+capacity = as.numeric(nwdc$capacity)
+
+nwdc_adp = nwdc %>% 
+  select(ends_with('_adp') & !contains('bookin'))
+
+avail_bedspace = capacity - nwdc_adp
+
+avail_bedspace_pivot <- avail_bedspace %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fiscal_year",
+    values_to = "bedspace",
+    values_drop_na = TRUE
+  )
+
+avail_bedspace_pivot$fiscal_year <- avail_bedspace_pivot$fiscal_year %>% str_replace_all('[aA-zZ]', '')
+
+avail_bedspace_pivot$fiscal_year <- paste('20', avail_bedspace_pivot$fiscal_year, sep='')
+
+avail_bedspace_pivot$fiscal_year <- as.integer(avail_bedspace_pivot$fiscal_year) 
+
+avail_bedspace_pivot %>% write.csv(here('analyze', 'output', 'nwdc_avail_bedspace.csv'))
+
+```
+```{r}
+known_cap <- df_facilities %>% 
+  filter(capacity != 'AS NEEDED')
+
+known_cap$capacity <- as.numeric(known_cap$capacity)
+
+known_cap_aor <- known_cap %>% 
+  group_by(aor) %>% 
+  summarize_at(vars('capacity'), sum) %>%
+  ungroup()
+
+known_cap_adp <- known_cap %>% 
+  group_by(aor) %>% 
+  summarize_at(vars(ends_with('adp'), -contains('bookin')), sum) %>%
+  ungroup()
+
+known_cap_aor_adp <-
+  full_join(known_cap_aor, known_cap_adp, by = 'aor')
+
+data <- known_cap_aor_adp %>% 
+  mutate(capacity - known_cap_aor_adp %>% select(ends_with('adp')))
+
+data <- data %>% 
+  set_names(~ str_to_lower(.) %>% str_replace_all('adp', 'space'))
+
+data_pivot <- data %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "space",
+    values_drop_na = TRUE
+  )
+
+data_pivot$fy <- data_pivot$fy %>% str_replace_all('[aA-zZ]', '')
+
+data_pivot$fy <- paste('20', data_pivot$fy, sep='')
+
+data_pivot$fy <- as.integer(data_pivot$fy) 
+
+data_pivot %>%
+  ggplot(aes(x = fy, y = space, group = aor, color = aor)) + 
+  geom_hline(yintercept=0, alpha=.33) +  
+  geom_line() +
+  xlab("FY") +
+  ylab("Known detention space") + 
+  ggtitle("Known detention space by AOR") +
+  theme_bw() + 
+  facet_wrap(~ aor) +
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+data_pivot %>% write.csv(here('analyze', 'output', 'known_bedspace.csv'))
+
+```
+
+```{r}
+max_pop_adp <- df_facilities %>% 
+  select(c('detloc', 'aor', 'fy18_max_population_count'), ends_with('adp'), -contains('bookin'))
+
+diff_from_max <- max_pop_adp %>% 
+  mutate_at(
+    vars(ends_with('adp')),
+    list(~ max_pop_adp$fy18_max_population_count - .)
+  )
+
+diff_from_max_aor <- diff_from_max %>% 
+  group_by(aor) %>% 
+  summarize_at(vars(ends_with('adp')), sum) %>%
+  ungroup()
+
+data <- diff_from_max_aor %>% 
+  set_names(~ str_to_lower(.) %>% str_replace_all('adp', 'diff_from_max'))
+
+data_pivot <- data %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "diff_from_max",
+    values_drop_na = TRUE
+  )
+
+data_pivot$fy <- data_pivot$fy %>% str_replace_all('[aA-zZ]', '')
+
+data_pivot$fy <- paste('20', data_pivot$fy, sep='')
+
+data_pivot$fy <- as.integer(data_pivot$fy) 
+
+data_pivot %>%
+  ggplot(aes(x = fy, y = diff_from_max, group = aor, color = aor)) + 
+  geom_hline(yintercept=0, alpha=.33) +  
+  geom_line() +
+  xlab("FY") +
+  ylab("Difference") + 
+  ggtitle("Difference from FY18 max pop by AOR") +
+  theme_bw() + 
+  facet_wrap(~ aor) +
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+```
+
+
+```{r}
+
+data <- df_aor_adp_enforcement_long_complete %>% 
+  select(c('fy','aor','adp', 'n_removals', 'n_arrests', 'n_encounters')) %>% 
+  pivot_longer(
+    cols = starts_with("n_"),
+    names_to = "enforcement_measure",
+    values_to = "n_enforcement",
+    values_drop_na = TRUE
+  )
+
+sp <- ggscatter(data, x = "adp", y = "n_enforcement", color = "aor", facet.by = "enforcement_measure",
+   add = "reg.line",  # Add regressin line
+   add.params = list(color = "black", fill = "lightgray"), # Customize reg. line
+   conf.int = TRUE # Add confidence interval
+   ) +
+  labs(title='ICE enforcement measures by adp per aor, FY2016-2018 ')
+# Add correlation coefficient
+sp + stat_cor(method = "pearson", label.x = 1000, label.y = 60000)
 ```
 
