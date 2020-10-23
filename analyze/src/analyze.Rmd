@@ -111,8 +111,15 @@ df_facilities <- df_facilities %>%
 
 # ARRESTS
 
+#Drop missing aor
+
+predrop <- nrow(df_arrests) 
+
 df_arrests <- df_arrests %>% 
   filter(!is.na(aor))
+
+arrestmissingaor <- predrop - nrow(df_arrests)
+#3,808 missing aor
 
 df_arrests <- df_arrests %>% 
   separate(apprehension_date, 
@@ -205,8 +212,7 @@ df_removals$departed_fy <- as.integer(df_removals$departed_fy)
 # aggregate arrests to aor
 df_aor_arrests <- df_arrests %>%
   group_by(aor, apprehension_fy) %>% 
-  summarize(n_arrests = n()) %>%
-  ungroup()
+  summarize(n_arrests = n()) 
 
 # plot arrests levels
   ggplot(df_aor_arrests) + 
@@ -290,10 +296,6 @@ df_aor_removals <- df_removals %>%
   summarize(n_removals = n()) %>%
   ungroup()
 
-# plot removals levels
-  ggplot(df_aor_removals) + 
-    geom_histogram(mapping = aes(x = n_removals))
-
 # plot removals by fiscal year across aor
 ggplot(data = df_aor_removals,
        aes(x = removal_fy, 
@@ -326,6 +328,7 @@ ggsave(here("analyze", "output", "removals_facet.pdf"))
 
 ```{r aggregate_adp_to_aor, echo=FALSE, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
 # aggregate adp to aor
+#Group by aor and take all the fields with "average daily pop" except for fields that have booking
 df_aor_adp <- df_facilities %>%
   group_by(aor) %>% 
   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
@@ -339,7 +342,9 @@ df_aor_adp_pivot <- df_aor_adp %>%
     values_drop_na = TRUE
   )
 
+#Drop from column name everything except for integers
 df_aor_adp_pivot$fiscal_year <- df_aor_adp_pivot$fiscal_year %>% str_replace_all('[aA-zZ]', '')
+
 
 df_aor_adp_pivot$fiscal_year <- paste('20', df_aor_adp_pivot$fiscal_year, sep='')
 
@@ -377,6 +382,8 @@ df_aor_arrests %>%
 df_aor_enforcement_long <- data.frame(fy = integer(),
                  aor = character(), 
                  stringsAsFactors = FALSE)
+
+#We are calling enforcement the data with encounters and arrests together
 
 # join aor-level encounters data
 df_aor_enforcement_long <- df_aor_enforcement_long %>% 
@@ -511,6 +518,8 @@ ggsave(here("analyze", "output", "removals_over_time.pdf"))
 ```
 
 ```{r }
+
+#Restrict observations to where we have complete data 
 df_aor_adp_enforcement_long_complete <- df_aor_adp_enforcement_long %>%
   filter(!is.na(adp),           # remove missing adp
          !is.na(n_encounters),  # remove missing encounters
