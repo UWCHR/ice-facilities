@@ -21,28 +21,28 @@ library(ggpubr)
 ```{r data_import, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 
 df_facilities <- read_delim(
-  here('analyze', 'input', 'facil-list.csv.gz'), 
+  here::here('analyze', 'input', 'facil-list.csv.gz'), 
   delim = "|") 
 
 df_dmcp <- read_delim(
-  here('analyze', 'input', 'dmcp-detailed.csv.gz'),
+  here::here('analyze', 'input', 'dmcp-detailed.csv.gz'),
   delim = "|")
           
 df_encounters <- read_delim(
-  here('analyze', 'input', 'encounters.csv.gz'), 
+  here::here('analyze', 'input', 'encounters.csv.gz'), 
   delim = "|")
     
 df_arrests <- read_delim(
-  here('analyze', 'input', 'arrests.csv.gz'),
+  here::here('analyze', 'input', 'arrests.csv.gz'),
   delim = "|")
   
 df_removals <- read_delim(
-  here('analyze', 'input', 'removals.csv.gz'),
+  here::here('analyze', 'input', 'removals.csv.gz'),
   delim = "|")
 
 # This should be in input or frozen instead depending on where AOR-county task ultimately lives
 aor_counties <- read_delim(
-  here('analyze', 'output', 'county_aor.csv'),
+  here::here('analyze', 'output', 'county_aor.csv'),
   delim = ',')
 
 ```
