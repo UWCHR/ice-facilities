@@ -15,7 +15,6 @@ library(broom)
 library(margins)
 library(purrr)
 library(ggpubr)
-
 ```
 
 ```{r data_import, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
@@ -69,10 +68,6 @@ df_dmcp_as_needed <- df_dmcp %>%
 
 df_facilities <- df_facilities %>% 
   filter(detloc %in% df_dmcp$detloc)
-
-df_facilities %>% 
-  filter(detloc %in% df_dmcp_as_needed$detloc ) %>% 
-  summary()
 
 # Testing that no other facilties are redacted
 stopifnot(sum(df_facilities$detloc == 'Redacted') == 0)
@@ -344,7 +339,6 @@ df_aor_adp_pivot <- df_aor_adp %>%
 
 #Drop from column name everything except for integers
 df_aor_adp_pivot$fiscal_year <- df_aor_adp_pivot$fiscal_year %>% str_replace_all('[aA-zZ]', '')
-
 
 df_aor_adp_pivot$fiscal_year <- paste('20', df_aor_adp_pivot$fiscal_year, sep='')
 
@@ -904,6 +898,7 @@ df_aor_adp_arrests_monthly %>%
   summarize(r = cor(pct_diff_adp, pct_diff_arrests)) %>% pull(r)
 
 ```
+
 ```{r}
 
 nwdc <- df_facilities %>% 
@@ -1052,5 +1047,41 @@ sp <- ggscatter(data, x = "adp", y = "n_enforcement", color = "aor", facet.by = 
   labs(title='ICE enforcement measures by adp per aor, FY2016-2018 ')
 # Add correlation coefficient
 sp + stat_cor(method = "pearson", label.x = 1000, label.y = 60000)
+```
+
+```{r}
+
+# Select DMCP "AS NEEDED" facilities in main sheet of data ("df_facilities") and aggregate to AOR level
+
+aor_asneeded <- df_facilities %>% 
+  filter(detloc %in% df_dmcp_as_needed$detloc ) %>%
+  group_by(aor) %>% 
+  summarize_at(vars(ends_with("_adp"), -contains("bookin")), sum) %>%
+  ungroup() # 24 AORs
+
+aor_as_needed_pivot <- aor_asneeded %>% 
+    pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fiscal_year",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+# plot arrests by fiscal year across aor with facet wrap
+ggplot(data = aor_as_needed_pivot,
+       aes(x = fiscal_year, 
+           y = adp, 
+           group = aor, 
+           color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("ADP") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="'AS NEEDED' ADP (DMCP authorized facilities)", caption="*FY2019 data through Aug. 2019")
+ggsave(here("analyze", "output", "as_needed_adp_facet.pdf"))
+
+
 ```
 
