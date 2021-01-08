@@ -10,27 +10,31 @@ library(tigris)
 library(sf)
 library(yaml)
 library(here)
+library(assertr)
 
 # setwd('~/git/ice-facilities/analyze/src/')
 
+# https://walker-data.com/tidycensus/articles/basic-usage.html
 # check census api key
 Sys.getenv("CENSUS_API_KEY")
 
 # use tigris
 options(tigris_use_cache = TRUE)
 
+# load table of variable names, labels
+v18 <- load_variables(2018, "acs1", cache = TRUE)
+
 # return data frame of geographical unit identifier and descriptive name
 df_counties <- get_acs(
   geography = "county", 
   variables = c("Total Population" = "B01003_001"),
   year = 2018,
-  survey = "acs5") %>%
-  select(c("GEOID", "NAME")) # keep county geoid and name
+  survey = "acs1")
 
-  # standardize variable names
-  names(df_counties) <- tolower(names(df_counties))
+# standardize variable names
+df_counties$name <- tolower(df_counties$name)
   
-  # separate geoid into state and county identifiers
+# separate geoid into state and county identifiers
 df_counties <- df_counties %>%
   separate(geoid, 
            c("geoid_state", 
@@ -41,8 +45,9 @@ df_counties <- df_counties %>%
 
 # generate variable indicating aor
 df_counties <- df_counties %>%
-  mutate(aor = "")
-  # assign states to aors
+  mutate(aor = NA_character_)
+
+# assign states to aors
 df_counties <- mutate(df_counties, aor = 
     # assign states to aors
         ifelse(geoid_state %in% c("13", "37", "45"), "ATL",
@@ -332,9 +337,15 @@ df_counties <- mutate(df_counties, aor =
         ifelse(geoid %in% c("06029", "06015", "06093", "06049", "06023", "06105", "06089", "06035", "06103", "06063", "06045", "06021", "06033", "06011", "06007", "06115", "06057", "06091", "06097", "06055", "06041", "06101", "06113", "06095", "06067", "06061", "06017", "06005", "06009", "06003", "06109", "06051", "06075", "06013", "06001", "06077", "06099", "06043", "06081", "06085", "06047", "06039", "06087", "06053", "06069", "06019", "06031", "06107", "06027"), "SFR", 
         ifelse(geoid %in% c("06073", "06025"), "SND", "Fail"))))))))))))))))))))))))))))
 
-outputfile <- here('git', 'ice-facilities', 'analyze', 'output', 'county_aor.csv')
+# Check if any estimate fields null
+# df_counties %>% 
+#  assert(not_na(), estimate)
+
+# Writing out county to AOR mapping
+outputfile <- here('analyze', 'output', 'county_aor.csv')
 write_csv(df_counties, outputfile)
-outputfile <- here('git', 'ice-facilities', 'analyze', 'output', 'county_aor.yaml')
+
+outputfile <- here('analyze', 'output', 'county_aor.yaml')
 write_yaml(select(df_counties, geoid, aor), outputfile, fileEncoding = "UTF-8")
 
 us <- counties(year = 2018, class = "sf")
@@ -343,7 +354,7 @@ us <- merge(us, select(df_counties, aor, geoid), by='geoid')
 
 ggplot(us) + 
     geom_sf(aes(fill = aor), color = NA) + 
-    coord_sf(xlim = c(-130, -65), ylim = c(24, 51), expand = FALSE)
+    coord_sf(xlim = c(-130, -65), ylim = c(24, 51), expand = FALSE) +
     theme_void()
 
 # https://r-spatial.github.io/sf/articles/sf4.html
