@@ -22,14 +22,18 @@ Sys.getenv("CENSUS_API_KEY")
 options(tigris_use_cache = TRUE)
 
 # load table of variable names, labels
-v18 <- load_variables(2018, "acs1", cache = TRUE)
+v18 <- load_variables(2018, "acs5", cache = TRUE)
 
 # return data frame of geographical unit identifier and descriptive name
 df_counties <- get_acs(
   geography = "county", 
   variables = c("Total Population" = "B01003_001"),
   year = 2018,
-  survey = "acs1")
+  survey = "acs5")
+
+df_counties <- df_counties %>% 
+  rename(name = NAME,
+         geoid = GEOID)
 
 # standardize variable names
 df_counties$name <- tolower(df_counties$name)
@@ -337,9 +341,7 @@ df_counties <- mutate(df_counties, aor =
         ifelse(geoid %in% c("06029", "06015", "06093", "06049", "06023", "06105", "06089", "06035", "06103", "06063", "06045", "06021", "06033", "06011", "06007", "06115", "06057", "06091", "06097", "06055", "06041", "06101", "06113", "06095", "06067", "06061", "06017", "06005", "06009", "06003", "06109", "06051", "06075", "06013", "06001", "06077", "06099", "06043", "06081", "06085", "06047", "06039", "06087", "06053", "06069", "06019", "06031", "06107", "06027"), "SFR", 
         ifelse(geoid %in% c("06073", "06025"), "SND", "Fail"))))))))))))))))))))))))))))
 
-# Check if any estimate fields null
-# df_counties %>% 
-#  assert(not_na(), estimate)
+# Figure out how to check if any counties dropped
 
 # Writing out county to AOR mapping
 outputfile <- here('analyze', 'output', 'county_aor.csv')
