@@ -1,0 +1,95 @@
+---
+title: "AOR-weighted"
+author: "UWCHR"
+date: "1/15/2021"
+output: html_document
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+library(here)
+library(tidyverse)
+library(lubridate)
+library(skimr)
+library(tidycensus)
+library(tigris)
+library(sf)
+library(yaml)
+library(here)
+library(assertr)
+library(ggrepel)
+```
+
+```{r load_files, echo=FALSE}
+
+arrests <- read_delim(
+  here::here('analyze', 'output', 'arrests.csv'), 
+  delim = "|") 
+
+encounters <- read_delim(
+  here::here('analyze', 'output', 'encounters.csv'), 
+  delim = "|") 
+
+removals <- read_delim(
+  here::here('analyze', 'output', 'removals.csv'), 
+  delim = "|") 
+
+facilities <- read_delim(
+  here::here('analyze', 'output', 'facilities.csv'), 
+  delim = "|") 
+
+county_aor <- read_delim(
+  here::here('analyze', 'output', 'county_aor.csv'), 
+  delim = ",")
+
+```
+
+``` {r group}
+
+# group arrests by aor
+aor_arrests <- arrests %>%
+  group_by(aor, apprehension_fy) %>% 
+  summarize(n_arrests = n()) %>% 
+  rename(
+    fy = apprehension_fy
+  )
+
+# group county pop by aor
+aor_pop <- county_aor %>% 
+  group_by(aor) %>% 
+  summarize(population = sum(estimate))
+
+# group adp by aor
+aor_adp <- facilities %>%
+  group_by(aor) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  ungroup() # 24 AORs
+
+aor_adp <- aor_adp %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+aor_adp$fy <- aor_adp$fy %>% str_replace_all('[aA-zZ]', '')
+aor_adp$fy <- paste('20', aor_adp$fy, sep='')
+aor_adp$fy <- as.integer(aor_adp$fy) 
+
+aor_arrests_adp <- merge(aor_arrests, aor_adp, by=c('aor', 'fy'))
+
+aor_arrests_adp <- merge(aor_arrests_adp, aor_pop, by='aor')
+aor_arrests_adp$adp_per_capita = aor_arrests_adp$adp / aor_arrests_adp$population
+aor_arrests_adp$arrests_per_capita = aor_arrests_adp$n_arrests / aor_arrests_adp$population
+
+
+```
+
+```{r plot}
+
+aor_arrests_adp %>% 
+  ggplot(aes(x = adp_per_capita, y = arrests_per_capita, colour=aor, label=aor)) +
+  geom_point()
+
+```
+
