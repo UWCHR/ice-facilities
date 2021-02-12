@@ -1,0 +1,186 @@
+---
+title: "facility-characteristics"
+author: "UWCHR"
+date: "2/12/2021"
+output: html_document
+---
+
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+library(tidyverse)
+library(here)
+library(lubridate)
+library(skimr)
+library(tigris)
+library(sf)
+library(yaml)
+library(here)
+library(assertr)
+library(ggrepel)
+```
+
+```{r load_files, echo=FALSE}
+
+facilities <- read_delim(
+  here::here('analyze', 'input', 'facil-list.csv.gz'), 
+  delim = "|") 
+
+dmcp <- read_delim(
+  here::here('analyze', 'input', 'dmcp-detailed.csv.gz'), 
+  delim = "|") 
+
+```
+
+```{r facil_data_setup_and_filter, message=FALSE, warning=FALSE}
+
+# There's probably a nicer way to convert various fields to factor
+# Ideally specify field type on import
+facilities <- facilities %>%
+  mutate(detloc = as.factor(detloc))
+
+facilities <- facilities %>%
+  mutate(state = as.factor(state))
+
+facilities <- facilities %>%
+  mutate(city = as.factor(city))
+
+facilities <- facilities %>%
+  mutate(zip = as.factor(zip))
+
+facilities <- facilities %>%
+  mutate(aor = as.factor(aor))
+
+facilities <- facilities %>%
+  mutate(type = as.factor(type))
+
+dmcp <- dmcp %>%
+  mutate(state = as.factor(state))
+
+dmcp <- dmcp %>%
+  mutate(aor = as.factor(aor))
+
+dmcp$over_under_72 <- as.factor(dmcp$over_under_72)
+
+# We don't actually want to filter by facility type here 
+
+# facilities <- facilities %>% 
+  # filter(type != "ORR")
+
+# dmcp <- dmcp %>% 
+#   filter(over_under_72 == "Over 72")
+
+# dmcp_as_needed <- dmcp %>% 
+#   filter(capacity == "AS NEEDED")
+
+# facilities <- facilities %>% 
+#   filter(detloc %in% dmcp$detloc)
+
+
+# Concatenate facility city and state columns
+facilities <- facilities %>% 
+  unite("city", c(city,state), sep = ", ", remove = FALSE, na.rm = FALSE) %>%
+  mutate(city = as.factor(city))
+
+```
+
+```{r as_needed_natl}
+
+facilities$as_needed <- facilities$capacity == 'AS NEEDED'
+
+as_needed_adp <- facilities %>% 
+  group_by(as_needed) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+as_needed_adp$fy <- as_needed_adp$fy %>% str_replace_all('[aA-zZ]', '')
+as_needed_adp$fy <- paste('20', as_needed_adp$fy, sep='')
+as_needed_adp$fy <- as.integer(as_needed_adp$fy) 
+
+p <- ggplot(data = as_needed_adp,
+       aes(x = fy, 
+           y = adp, 
+           group = as_needed, 
+           color = as_needed)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total ADP") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly ADP by 'AS NEEDED' capacity status", caption="*FY2019 data through Aug. 2019")
+
+p
+
+```
+
+```{r as_needed_aor}
+
+as_needed_adp_aor <- facilities %>% 
+  group_by(aor, as_needed) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+as_needed_adp_aor$fy <- as_needed_adp_aor$fy %>% str_replace_all('[aA-zZ]', '')
+as_needed_adp_aor$fy <- paste('20', as_needed_adp_aor$fy, sep='')
+as_needed_adp_aor$fy <- as.integer(as_needed_adp_aor$fy) 
+
+p <- ggplot(data = as_needed_adp_aor,
+       aes(x = fy, 
+           y = adp, 
+           group = as_needed, 
+           color = as_needed)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total ADP") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly ADP by 'AS NEEDED' capacity status", caption="*FY2019 data through Aug. 2019")
+
+p
+
+```
+
+```{r as_needed_aor_proportion}
+
+as_needed_adp_aor <- facilities %>% 
+  group_by(aor, as_needed) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>% 
+    pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  ) %>% 
+  pivot_wider(
+    names_from = 'as_needed',
+    values_from = 'adp'
+  )
+
+as_needed_adp_aor$proportion_as_needed <- as_needed_adp_aor$'TRUE' / as_needed_adp_aor$'FALSE'
+
+p <- as_needed_adp_aor %>% 
+  filter(aor != 'BAL') %>% 
+  ggplot(
+       aes(x = fy, 
+           y = proportion_as_needed, 
+           group = aor, 
+           color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Proportion ADP") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Proportion ADP 'AS NEEDED'", caption="*FY2019 data through Aug. 2019, 'BAL' excluded")
+
+p
+
+```
