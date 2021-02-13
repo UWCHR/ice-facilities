@@ -2,10 +2,17 @@
 title: "facility-characteristics"
 author: "UWCHR"
 date: "2/12/2021"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
+Analyzing detention facility population by facility characteristic: "AS NEEDED" facilities; DMCP-authorized facilities; "Over-72" hour facilities. Also check based on contract type/jurisdiction (may require light cleaning).
+
+Starting with annual ADP. Recall that ADP does not equate to number of people passing through facility. Check book-ins along same lines.
+
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# A few of these redundant
 library(tidyverse)
 library(here)
 library(lubridate)
@@ -16,9 +23,10 @@ library(yaml)
 library(here)
 library(assertr)
 library(ggrepel)
+
 ```
 
-```{r load_files, echo=FALSE}
+```{r load_files, echo=FALSE, message=FALSE, warning=FALSE,}
 
 facilities <- read_delim(
   here::here('analyze', 'input', 'facil-list.csv.gz'), 
@@ -30,9 +38,8 @@ dmcp <- read_delim(
 
 ```
 
-```{r facil_data_setup_and_filter, message=FALSE, warning=FALSE}
+```{r facil_data_setup_and_filter, echo=FALSE, message=FALSE, warning=FALSE,}
 
-# There's probably a nicer way to convert various fields to factor
 # Ideally specify field type on import
 facilities <- facilities %>%
   mutate(detloc = as.factor(detloc))
@@ -60,10 +67,10 @@ dmcp <- dmcp %>%
 
 dmcp$over_under_72 <- as.factor(dmcp$over_under_72)
 
-# We don't actually want to filter by facility type here 
+# We don't actually want to filter by facility type here except ORR
 
-# facilities <- facilities %>% 
-  # filter(type != "ORR")
+facilities <- facilities %>%
+  filter(type != "ORR")
 
 # dmcp <- dmcp %>% 
 #   filter(over_under_72 == "Over 72")
@@ -82,11 +89,14 @@ facilities <- facilities %>%
 
 ```
 
-```{r as_needed_natl}
+"AS NEEDED" facilities, though more common overall than facilities with reported ICE capacity, held a smaller and diminishing portion of detained people by total average ADP over the period from FY2009 - FY2018:
+
+```{r as_needed_adp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
 
 facilities$as_needed <- facilities$capacity == 'AS NEEDED'
 
 as_needed_adp <- facilities %>% 
+  filter(!is.null(capacity)) %>% 
   group_by(as_needed) %>% 
   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
   pivot_longer(
@@ -110,15 +120,18 @@ p <- ggplot(data = as_needed_adp,
   ylab("Total ADP") +
   theme_bw() + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
-  labs(title="Yearly ADP by 'AS NEEDED' capacity status", caption="*FY2019 data through Aug. 2019")
+  labs(title="Yearly ADP by 'AS NEEDED' capacity status")
 
 p
 
 ```
 
-```{r as_needed_aor}
+'AS NEEDED' yearly ADP per AOR shows varied distributions and trends; 'AS NEEDED' ADP tends to be mostly stable year to year, while facilities with known capacity show more notable trends. Note divergence in New Orleans AOR 'NOL':
+
+```{r as_needed_adp_aor, echo=FALSE, message=FALSE, warning=FALSE,}
 
 as_needed_adp_aor <- facilities %>% 
+  filter(!is.null(capacity)) %>% 
   group_by(aor, as_needed) %>% 
   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
   pivot_longer(
@@ -143,15 +156,18 @@ p <- ggplot(data = as_needed_adp_aor,
   theme_bw() + 
   facet_wrap(~ aor) + 
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
-  labs(title="Yearly ADP by 'AS NEEDED' capacity status", caption="*FY2019 data through Aug. 2019")
+  labs(title="Yearly total ADP by 'AS NEEDED' capacity status")
 
 p
 
 ```
 
-```{r as_needed_aor_proportion}
+Most AORs held low proportion of population in "AS NEEDED" facilities:
+
+```{r as_needed_adp_aor_proportion, echo=FALSE, message=FALSE, warning=FALSE,}
 
 as_needed_adp_aor <- facilities %>% 
+  filter(!is.null(capacity)) %>% 
   group_by(aor, as_needed) %>% 
   summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>% 
     pivot_longer(
@@ -168,7 +184,7 @@ as_needed_adp_aor <- facilities %>%
 as_needed_adp_aor$proportion_as_needed <- as_needed_adp_aor$'TRUE' / as_needed_adp_aor$'FALSE'
 
 p <- as_needed_adp_aor %>% 
-  filter(aor != 'BAL') %>% 
+  filter(aor != 'BAL') %>%
   ggplot(
        aes(x = fy, 
            y = proportion_as_needed, 
@@ -177,9 +193,154 @@ p <- as_needed_adp_aor %>%
   geom_line() +
   xlab("Fiscal Year") +
   ylab("Proportion ADP") +
-  theme_bw() + 
+  theme_bw() +  
+  facet_wrap(~ aor) +
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Proportion ADP 'AS NEEDED'", caption="*FY2019 data through Aug. 2019, 'BAL' excluded")
+
+p
+
+```
+
+DMCP-authorized facilities held more and increasing number of detained people:
+
+```{r dmcp_adp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
+
+facilities$dmcp <- facilities$detloc %in% dmcp$detloc
+
+dmcp_adp <- facilities %>% 
+  group_by(dmcp) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+dmcp_adp$fy <- dmcp_adp$fy %>% str_replace_all('[aA-zZ]', '')
+dmcp_adp$fy <- paste('20', dmcp_adp$fy, sep='')
+dmcp_adp$fy <- as.integer(dmcp_adp$fy) 
+
+p <- ggplot(data = dmcp_adp,
+       aes(x = fy, 
+           y = adp, 
+           group = dmcp, 
+           color = dmcp)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total ADP") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly ADP by DMCP status")
+
+p
+
+```
+
+Varied distributions and trends of detained population (ADP) held in DMCP-authorized facilities; most AOR similar to national trend of greater & increasing population in DMCP facilities.
+
+```{r dmcp_adp_aor, echo=FALSE, message=FALSE, warning=FALSE,}
+
+dmcp_adp_aor <- facilities %>% 
+  group_by(aor, dmcp) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+dmcp_adp_aor$fy <- dmcp_adp_aor$fy %>% str_replace_all('[aA-zZ]', '')
+dmcp_adp_aor$fy <- paste('20', dmcp_adp_aor$fy, sep='')
+dmcp_adp_aor$fy <- as.integer(dmcp_adp_aor$fy) 
+
+p <- ggplot(data = dmcp_adp_aor,
+       aes(x = fy, 
+           y = adp, 
+           group = dmcp, 
+           color = dmcp)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total ADP") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly total ADP by DMCP capacity status")
+
+p
+
+```
+
+Greater and slightly-increasing proportion of ADP in "Over 72" facilities. Should do some more checking for what facilities with null values in `over_under_72` represent:
+
+```{r over_72_adp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
+
+facilities$over_72 <- facilities$over_under_72 == "Over 72"
+
+over_72_adp <- facilities %>% 
+  filter(!is.null(over_under_72)) %>%
+  group_by(over_72) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+over_72_adp$fy <- over_72_adp$fy %>% str_replace_all('[aA-zZ]', '')
+over_72_adp$fy <- paste('20', over_72_adp$fy, sep='')
+over_72_adp$fy <- as.integer(over_72_adp$fy) 
+
+p <- ggplot(data = over_72_adp,
+       aes(x = fy, 
+           y = adp, 
+           group = over_72, 
+           color = over_72)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total ADP") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly ADP by Over-72 hour status")
+
+p
+
+```
+
+Note expansion of "Over 72" ADP in Atlanta 'ATL', San Antonio 'SNA' AORs:
+
+```{r over_72_adp_aor, echo=FALSE, message=FALSE, warning=FALSE,}
+
+over_72_adp_aor <- facilities %>% 
+  filter(!is.null(over_under_72)) %>% 
+  group_by(aor, over_72) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+over_72_adp_aor$fy <- over_72_adp_aor$fy %>% str_replace_all('[aA-zZ]', '')
+over_72_adp_aor$fy <- paste('20', over_72_adp_aor$fy, sep='')
+over_72_adp_aor$fy <- as.integer(over_72_adp_aor$fy) 
+
+p <- ggplot(data = over_72_adp_aor,
+       aes(x = fy, 
+           y = adp, 
+           group = over_72, 
+           color = over_72)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total ADP") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly total ADP by Over-72 hour status")
 
 p
 
