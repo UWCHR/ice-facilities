@@ -7,9 +7,15 @@ output:
   pdf_document: default
 ---
 
-Analyzing detention facility population by facility characteristic: "AS NEEDED" facilities; DMCP-authorized facilities; "Over-72" hour facilities. Also check based on contract type/jurisdiction (may require light cleaning).
+Analyzing detention facility population by facility characteristic: "AS NEEDED" facilities; DMCP-authorized facilities; "Over-72" hour facilities. 
 
 Starting with annual ADP. Recall that ADP does not equate to number of people passing through facility. Check book-ins along same lines.
+
+To-do:
+- [ ] Population measures by contract type/jurisdiction (may require light cleaning)
+- [ ] Book-ins, initial book-ins measures by facility characteristic
+- [ ] Compare measures for three main categories of facilities: Over-72 hour DMCP; Under-72 hour + non-DMCP; ORR
+- [ ] Compare measures for sampled facilities versus non-sampled facilities
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # A few of these redundant
@@ -60,10 +66,9 @@ facilities <- facilities %>%
   mutate(type = as.factor(type))
 
 dmcp <- dmcp %>%
-  mutate(state = as.factor(state))
-
-dmcp <- dmcp %>%
-  mutate(aor = as.factor(aor))
+  mutate(state = as.factor(state),
+         aor = as.factor(aor),
+         detloc = as.factor(detloc))
 
 dmcp$over_under_72 <- as.factor(dmcp$over_under_72)
 
@@ -89,7 +94,7 @@ facilities <- facilities %>%
 
 ```
 
-"AS NEEDED" facilities, though more common overall than facilities with reported ICE capacity, held a smaller and diminishing portion of detained people by total average ADP over the period from FY2009 - FY2018:
+"AS NEEDED" facilities, though more common overall than facilities with known ICE capacity, held a smaller and diminishing portion of detained people by total average ADP over the period from FY2009 - FY2018; most book-ins also at facilities with known ICE capacity (note total book-ins may double-count people due to facilty transfers):
 
 ```{r as_needed_adp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
 
@@ -106,11 +111,28 @@ as_needed_adp <- facilities %>%
     values_drop_na = TRUE
   )
 
+as_needed_bookins <- facilities %>% 
+  filter(!is.null(capacity)) %>% 
+  group_by(as_needed) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
 as_needed_adp$fy <- as_needed_adp$fy %>% str_replace_all('[aA-zZ]', '')
 as_needed_adp$fy <- paste('20', as_needed_adp$fy, sep='')
 as_needed_adp$fy <- as.integer(as_needed_adp$fy) 
 
-p <- ggplot(data = as_needed_adp,
+as_needed_bookins$fy <- as_needed_bookins$fy %>% str_replace_all('[aA-zZ]', '')
+as_needed_bookins$fy <- paste('20', as_needed_bookins$fy, sep='')
+as_needed_bookins$fy <- as.integer(as_needed_bookins$fy) 
+
+# data <- left_join(as_needed_adp, as_needed_bookins, by=c('as_needed', 'fy'))
+
+p1 <- ggplot(data = as_needed_adp,
        aes(x = fy, 
            y = adp, 
            group = as_needed, 
@@ -122,11 +144,25 @@ p <- ggplot(data = as_needed_adp,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Yearly ADP by 'AS NEEDED' capacity status")
 
-p
+p1
+
+p2 <- ggplot(data = as_needed_bookins,
+       aes(x = fy, 
+           y = bookins, 
+           group = as_needed, 
+           color = as_needed)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total bookins") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly total bookins by 'AS NEEDED' capacity status")
+
+p2
 
 ```
 
-'AS NEEDED' yearly ADP per AOR shows varied distributions and trends; 'AS NEEDED' ADP tends to be mostly stable year to year, while facilities with known capacity show more notable trends. Note divergence in New Orleans AOR 'NOL':
+'AS NEEDED' yearly ADP per AOR shows varied distributions and trends; 'AS NEEDED' ADP tends to be mostly stable year to year, while facilities with known capacity show more notable trends. Note divergence in New Orleans AOR 'NOL'. Total book-ins distributions vary, from AORs with majority booked in to facilities with known capacity, to AORs with roughly equal trends (suggestive of intra-AOR transfers?), to AORs with more book-ins at 'AS NEEDED' facilities:
 
 ```{r as_needed_adp_aor, echo=FALSE, message=FALSE, warning=FALSE,}
 
@@ -141,11 +177,26 @@ as_needed_adp_aor <- facilities %>%
     values_drop_na = TRUE
   )
 
+as_needed_bookins_aor <- facilities %>% 
+  filter(!is.null(capacity)) %>% 
+  group_by(aor, as_needed) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
 as_needed_adp_aor$fy <- as_needed_adp_aor$fy %>% str_replace_all('[aA-zZ]', '')
 as_needed_adp_aor$fy <- paste('20', as_needed_adp_aor$fy, sep='')
 as_needed_adp_aor$fy <- as.integer(as_needed_adp_aor$fy) 
 
-p <- ggplot(data = as_needed_adp_aor,
+as_needed_bookins_aor$fy <- as_needed_bookins_aor$fy %>% str_replace_all('[aA-zZ]', '')
+as_needed_bookins_aor$fy <- paste('20', as_needed_bookins_aor$fy, sep='')
+as_needed_bookins_aor$fy <- as.integer(as_needed_bookins_aor$fy) 
+
+p1 <- ggplot(data = as_needed_adp_aor,
        aes(x = fy, 
            y = adp, 
            group = as_needed, 
@@ -158,11 +209,26 @@ p <- ggplot(data = as_needed_adp_aor,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Yearly total ADP by 'AS NEEDED' capacity status")
 
-p
+p1
+
+p2 <- ggplot(data = as_needed_bookins_aor,
+       aes(x = fy, 
+           y = bookins, 
+           group = as_needed, 
+           color = as_needed)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total bookins") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly total bookins by 'AS NEEDED' capacity status")
+
+p2
 
 ```
 
-Most AORs held low proportion of population in "AS NEEDED" facilities:
+Most AORs held low proportion of population in 'AS NEEDED' facilities. Wide spread in proportion of bookins in 'AS NEEDED' facilities.
 
 ```{r as_needed_adp_aor_proportion, echo=FALSE, message=FALSE, warning=FALSE,}
 
@@ -181,9 +247,34 @@ as_needed_adp_aor <- facilities %>%
     values_from = 'adp'
   )
 
+as_needed_bookins_aor <- facilities %>% 
+  filter(!is.null(capacity)) %>% 
+  group_by(aor, as_needed) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  ) %>% 
+  pivot_wider(
+    names_from = 'as_needed',
+    values_from = 'bookins'
+  )
+
+as_needed_adp_aor$fy <- as_needed_adp_aor$fy %>% str_replace_all('[aA-zZ]', '')
+as_needed_adp_aor$fy <- paste('20', as_needed_adp_aor$fy, sep='')
+as_needed_adp_aor$fy <- as.integer(as_needed_adp_aor$fy) 
+
+as_needed_bookins_aor$fy <- as_needed_bookins_aor$fy %>% str_replace_all('[aA-zZ]', '')
+as_needed_bookins_aor$fy <- paste('20', as_needed_bookins_aor$fy, sep='')
+as_needed_bookins_aor$fy <- as.integer(as_needed_bookins_aor$fy) 
+
 as_needed_adp_aor$proportion_as_needed <- as_needed_adp_aor$'TRUE' / as_needed_adp_aor$'FALSE'
 
-p <- as_needed_adp_aor %>% 
+as_needed_bookins_aor$proportion_as_needed <- as_needed_bookins_aor$'TRUE' / as_needed_bookins_aor$'FALSE'
+
+p1 <- as_needed_adp_aor %>% 
   filter(aor != 'BAL') %>%
   ggplot(
        aes(x = fy, 
@@ -198,11 +289,28 @@ p <- as_needed_adp_aor %>%
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Proportion ADP 'AS NEEDED'", caption="*FY2019 data through Aug. 2019, 'BAL' excluded")
 
-p
+p1
+
+p2 <- as_needed_bookins_aor %>% 
+  filter(aor != 'BAL') %>%
+  ggplot(
+       aes(x = fy, 
+           y = proportion_as_needed, 
+           group = aor, 
+           color = aor)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Proportion bookins") +
+  theme_bw() +  
+  facet_wrap(~ aor) +
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Proportion bookins 'AS NEEDED'", caption="*FY2019 data through Aug. 2019, 'BAL' excluded")
+
+p2
 
 ```
 
-DMCP-authorized facilities held more and increasing number of detained people:
+DMCP-authorized facilities held/booked more and increasing number of detained people:
 
 ```{r dmcp_adp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
 
@@ -218,11 +326,25 @@ dmcp_adp <- facilities %>%
     values_drop_na = TRUE
   )
 
+dmcp_bookins <- facilities %>% 
+  group_by(dmcp) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
 dmcp_adp$fy <- dmcp_adp$fy %>% str_replace_all('[aA-zZ]', '')
 dmcp_adp$fy <- paste('20', dmcp_adp$fy, sep='')
 dmcp_adp$fy <- as.integer(dmcp_adp$fy) 
 
-p <- ggplot(data = dmcp_adp,
+dmcp_bookins$fy <- dmcp_bookins$fy %>% str_replace_all('[aA-zZ]', '')
+dmcp_bookins$fy <- paste('20', dmcp_bookins$fy, sep='')
+dmcp_bookins$fy <- as.integer(dmcp_bookins$fy) 
+
+p1 <- ggplot(data = dmcp_adp,
        aes(x = fy, 
            y = adp, 
            group = dmcp, 
@@ -234,7 +356,21 @@ p <- ggplot(data = dmcp_adp,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Yearly ADP by DMCP status")
 
-p
+p1
+
+p2 <- ggplot(data = dmcp_bookins,
+       aes(x = fy, 
+           y = bookins, 
+           group = dmcp, 
+           color = dmcp)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total bookins") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly bookins by DMCP status")
+
+p2
 
 ```
 
@@ -252,11 +388,25 @@ dmcp_adp_aor <- facilities %>%
     values_drop_na = TRUE
   )
 
+dmcp_bookins_aor <- facilities %>% 
+  group_by(aor, dmcp) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
 dmcp_adp_aor$fy <- dmcp_adp_aor$fy %>% str_replace_all('[aA-zZ]', '')
 dmcp_adp_aor$fy <- paste('20', dmcp_adp_aor$fy, sep='')
 dmcp_adp_aor$fy <- as.integer(dmcp_adp_aor$fy) 
 
-p <- ggplot(data = dmcp_adp_aor,
+dmcp_bookins$fy <- dmcp_bookins$fy %>% str_replace_all('[aA-zZ]', '')
+dmcp_bookins$fy <- paste('20', dmcp_bookins$fy, sep='')
+dmcp_bookins$fy <- as.integer(dmcp_bookins$fy) 
+
+p1 <- ggplot(data = dmcp_adp_aor,
        aes(x = fy, 
            y = adp, 
            group = dmcp, 
@@ -269,11 +419,28 @@ p <- ggplot(data = dmcp_adp_aor,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Yearly total ADP by DMCP capacity status")
 
-p
+p1
+
+p2 <- ggplot(data = dmcp_bookins_aor,
+       aes(x = fy, 
+           y = bookins, 
+           group = dmcp, 
+           color = dmcp)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total bookins") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly total bookins by DMCP capacity status")
+
+p2
 
 ```
 
-Greater and slightly-increasing proportion of ADP in "Over 72" facilities. Should do some more checking for what facilities with null values in `over_under_72` represent:
+Greater and slightly-increasing proportion of ADP in "Over 72" facilities. More bookins in "Over 72" facilities as well.
+
+Should do some more checking for what facilities with null values in `over_under_72` represent:
 
 ```{r over_72_adp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
 
@@ -290,11 +457,26 @@ over_72_adp <- facilities %>%
     values_drop_na = TRUE
   )
 
+over_72_bookins <- facilities %>% 
+  filter(!is.null(over_under_72)) %>%
+  group_by(over_72) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
 over_72_adp$fy <- over_72_adp$fy %>% str_replace_all('[aA-zZ]', '')
 over_72_adp$fy <- paste('20', over_72_adp$fy, sep='')
 over_72_adp$fy <- as.integer(over_72_adp$fy) 
 
-p <- ggplot(data = over_72_adp,
+over_72_bookins$fy <- over_72_bookins$fy %>% str_replace_all('[aA-zZ]', '')
+over_72_bookins$fy <- paste('20', over_72_bookins$fy, sep='')
+over_72_bookins$fy <- as.integer(over_72_bookins$fy) 
+
+p1 <- ggplot(data = over_72_adp,
        aes(x = fy, 
            y = adp, 
            group = over_72, 
@@ -306,11 +488,25 @@ p <- ggplot(data = over_72_adp,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Yearly ADP by Over-72 hour status")
 
-p
+p1
+
+p2 <- ggplot(data = over_72_bookins,
+       aes(x = fy, 
+           y = bookins, 
+           group = over_72, 
+           color = over_72)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total bookins") +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly bookins by Over-72 hour status")
+
+p2
 
 ```
 
-Note expansion of "Over 72" ADP in Atlanta 'ATL', San Antonio 'SNA' AORs:
+Note expansion of "Over 72" ADP in Atlanta 'ATL', San Antonio 'SNA' AORs; more booked in at "Under 72" facilities in DAL, PHO, SND: 
 
 ```{r over_72_adp_aor, echo=FALSE, message=FALSE, warning=FALSE,}
 
@@ -325,11 +521,26 @@ over_72_adp_aor <- facilities %>%
     values_drop_na = TRUE
   )
 
+over_72_bookins_aor <- facilities %>% 
+  filter(!is.null(over_under_72)) %>% 
+  group_by(aor, over_72) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
 over_72_adp_aor$fy <- over_72_adp_aor$fy %>% str_replace_all('[aA-zZ]', '')
 over_72_adp_aor$fy <- paste('20', over_72_adp_aor$fy, sep='')
 over_72_adp_aor$fy <- as.integer(over_72_adp_aor$fy) 
 
-p <- ggplot(data = over_72_adp_aor,
+over_72_bookins_aor$fy <- over_72_bookins_aor$fy %>% str_replace_all('[aA-zZ]', '')
+over_72_bookins_aor$fy <- paste('20', over_72_bookins_aor$fy, sep='')
+over_72_bookins_aor$fy <- as.integer(over_72_bookins_aor$fy) 
+
+p1 <- ggplot(data = over_72_adp_aor,
        aes(x = fy, 
            y = adp, 
            group = over_72, 
@@ -342,6 +553,36 @@ p <- ggplot(data = over_72_adp_aor,
   theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
   labs(title="Yearly total ADP by Over-72 hour status")
 
-p
+p1
+
+p2 <- ggplot(data = over_72_bookins_aor,
+       aes(x = fy, 
+           y = bookins, 
+           group = over_72, 
+           color = over_72)) + 
+  geom_line() +
+  xlab("Fiscal Year") +
+  ylab("Total bookins") +
+  theme_bw() + 
+  facet_wrap(~ aor) + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5)) +
+  labs(title="Yearly total bookins by Over-72 hour status")
+
+p2
+
+```
+
+```{r overall, echo=FALSE, message=FALSE, warning=FALSE,}
+
+dmcp <- dmcp %>%
+  filter(over_under_72 == "Over 72")
+
+dmcp_as_needed <- dmcp %>%
+  filter(capacity == "AS NEEDED")
+
+facilities$detloc <- as.character(facilities$detloc)
+
+facilities$sample <- facilities %>%
+  filter(detloc %in% dmcp$detloc)
 
 ```
