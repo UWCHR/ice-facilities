@@ -1,0 +1,207 @@
+---
+title: "facility-type"
+author: "UWCHR"
+date: "2/19/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# A few of these redundant
+library(tidyverse)
+library(here)
+library(lubridate)
+library(skimr)
+library(tigris)
+library(sf)
+library(yaml)
+library(here)
+library(assertr)
+library(ggrepel)
+```
+
+```{r load_files, echo=FALSE, message=FALSE, warning=FALSE,}
+
+facilities <- read_delim(
+  here::here('analyze', 'input', 'facil-list.csv.gz'), 
+  delim = "|") 
+
+dmcp <- read_delim(
+  here::here('analyze', 'input', 'dmcp-detailed.csv.gz'), 
+  delim = "|") 
+
+```
+
+```{r facil_data_setup_and_filter, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Ideally specify field type on import
+facilities <- facilities %>%
+  mutate(detloc = as.factor(detloc))
+
+facilities <- facilities %>%
+  mutate(state = as.factor(state))
+
+facilities <- facilities %>%
+  mutate(city = as.factor(city))
+
+facilities <- facilities %>%
+  mutate(zip = as.factor(zip))
+
+facilities <- facilities %>%
+  mutate(aor = as.factor(aor))
+
+facilities <- facilities %>%
+  mutate(type = as.factor(type))
+
+dmcp <- dmcp %>%
+  mutate(state = as.factor(state),
+         aor = as.factor(aor),
+         detloc = as.factor(detloc))
+
+dmcp$over_under_72 <- as.factor(dmcp$over_under_72)
+
+facilities <- facilities %>%
+  filter(type != "ORR")
+
+facilities$as_needed <- facilities$capacity == 'AS NEEDED'
+
+facilities$dmcp <- facilities$detloc %in% dmcp$detloc
+
+facilities$over_72 <- facilities$over_under_72 == "Over 72"
+
+sample <- dmcp %>%
+  filter(over_under_72 == "Over 72")
+
+facilities$sample <-facilities$detloc %in% sample$detloc
+
+# Concatenate facility city and state columns
+facilities <- facilities %>% 
+  unite("city", c(city,state), sep = ", ", remove = FALSE, na.rm = FALSE) %>%
+  mutate(city = as.factor(city))
+
+```
+
+By ADP, most detained people held in IGSA, CDF, USMS IGA facilities:
+
+```{r type_adp, echo=FALSE, message=FALSE, warning=FALSE}
+
+data <- facilities %>% 
+  group_by(type) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+p1 <- data %>%
+  ggplot(
+       aes(x = fy, 
+           y = adp, 
+           group = type, 
+           color = type)) + 
+  geom_line() +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+p1
+
+```
+
+Most detained people booked in to "Other", IGSA, USMS IGA facilities. "Other" includes hold rooms, staging facilities (look more closely at this category):
+
+```{r type_bookins, echo=FALSE, message=FALSE, warning=FALSE}
+
+data <-  facilities %>% 
+  group_by(type) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+p1 <- data %>%
+  ggplot(
+       aes(x = fy, 
+           y = adp, 
+           group = type, 
+           color = type)) + 
+  geom_line() +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+p1
+
+```
+
+```{r type_initial_bookins, echo=FALSE, message=FALSE, warning=FALSE}
+
+data <-  facilities %>% 
+  group_by(type) %>% 
+  summarize_at(vars(contains("initial"), -contains("adp"), ), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+p1 <- data %>%
+  ggplot(
+       aes(x = fy, 
+           y = adp, 
+           group = type, 
+           color = type)) + 
+  geom_line() +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+p1
+
+```
+This scatter plot may not be appropriate since bookins are cumulative and drop off in FY18:
+
+```{r type_adp_bookins, echo=FALSE, message=FALSE, warning=FALSE}
+
+data_adp <- facilities %>%
+  select(c('detloc', 'type', contains('adp'), -contains('bookin'))) %>% 
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+data_adp$fy <- data_adp$fy %>% str_replace_all('[aA-zZ]', '')
+data_adp$fy <- paste('20', data_adp$fy, sep='')
+data_adp$fy <- as.integer(data_adp$fy) 
+
+data_bookins <- facilities %>%
+  select(c('detloc', 'type', contains("bookins"), -contains("adp"), -contains("initial"))) %>% 
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
+data_bookins$fy <- data_bookins$fy %>% str_replace_all('[aA-zZ]', '')
+data_bookins$fy <- paste('20', data_bookins$fy, sep='')
+data_bookins$fy <- as.integer(data_bookins$fy) 
+
+data <- merge(data_adp, data_bookins, by=c('detloc', 'type', 'fy'))
+
+p1 <- data %>% 
+  ggplot(aes(
+    x = adp,
+    y = bookins,
+    color = type
+  )) +
+  geom_point()
+
+p1
+```

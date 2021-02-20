@@ -13,8 +13,8 @@ Starting with annual ADP. Recall that ADP does not equate to number of people pa
 
 To-do:
 - [ ] Population measures by contract type/jurisdiction (may require light cleaning)
-- [ ] Book-ins, initial book-ins measures by facility characteristic
-- [ ] Compare measures for sampled facilities versus non-sampled facilities
+- [X] Book-ins, initial book-ins measures by facility characteristic
+- [X] Compare measures for sampled facilities versus non-sampled facilities
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # A few of these redundant
@@ -74,6 +74,17 @@ dmcp$over_under_72 <- as.factor(dmcp$over_under_72)
 facilities <- facilities %>%
   filter(type != "ORR")
 
+facilities$as_needed <- facilities$capacity == 'AS NEEDED'
+
+facilities$dmcp <- facilities$detloc %in% dmcp$detloc
+
+facilities$over_72 <- facilities$over_under_72 == "Over 72"
+
+sample <- dmcp %>%
+  filter(over_under_72 == "Over 72")
+
+facilities$sample <-facilities$detloc %in% sample$detloc
+
 # Concatenate facility city and state columns
 facilities <- facilities %>% 
   unite("city", c(city,state), sep = ", ", remove = FALSE, na.rm = FALSE) %>%
@@ -84,8 +95,6 @@ facilities <- facilities %>%
 "AS NEEDED" facilities, though more common overall than facilities with known ICE capacity, held a smaller and diminishing portion of detained people by total average ADP over the period from FY2009 - FY2018; most book-ins also at facilities with known ICE capacity (note total book-ins may double-count people due to facilty transfers):
 
 ```{r as_needed_natl, echo=FALSE, message=FALSE, warning=FALSE,}
-
-facilities$as_needed <- facilities$capacity == 'AS NEEDED'
 
 as_needed_adp <- facilities %>% 
   filter(!is.null(capacity)) %>% 
@@ -284,7 +293,7 @@ data$fy <- as.integer(data$fy)
 
 b5 <- data %>% 
   ggplot(aes(x = as_needed,
-      y = adp,
+      y = log(adp),
       fill = as_needed)) +
   geom_boxplot() +
   facet_wrap(~aor)
@@ -400,8 +409,6 @@ p2
 DMCP-authorized facilities held/booked more and increasing number of detained people:
 
 ```{r dmcp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
-
-facilities$dmcp <- facilities$detloc %in% dmcp$detloc
 
 dmcp_adp <- facilities %>% 
   group_by(dmcp) %>% 
@@ -581,15 +588,57 @@ p2 <- ggplot(data = dmcp_bookins_aor,
 
 p2
 
+data <- facilities %>% 
+  select(c('dmcp', 'aor', contains('adp'), -contains('bookin'))) %>% 
+    pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+data$fy <- data$fy %>% str_replace_all('[aA-zZ]', '')
+data$fy <- paste('20', data$fy, sep='')
+data$fy <- as.integer(data$fy) 
+
+b5 <- data %>% 
+  ggplot(aes(x = dmcp,
+      y = log(adp),
+      fill = dmcp)) +
+  geom_boxplot() +
+  facet_wrap(~aor)
+
+b5
+
+data <- facilities %>% 
+  select(c('dmcp', 'aor', contains("bookins"), -contains("adp"), -contains("initial"))) %>% 
+    pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
+data$fy <- data$fy %>% str_replace_all('[aA-zZ]', '')
+data$fy <- paste('20', data$fy, sep='')
+data$fy <- as.integer(data$fy) 
+
+b6 <- data %>% 
+  ggplot(aes(x = dmcp,
+      y = log(bookins),
+      fill = dmcp)) +
+  geom_boxplot() +
+  facet_wrap(~aor)
+
+b6
+
 ```
 
 Greater and slightly-increasing proportion of ADP in "Over 72" facilities. More bookins in "Over 72" facilities as well.
 
 Should do some more checking for what facilities with null values in `over_under_72` represent:
 
-```{r over_72_adp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
-
-facilities$over_72 <- facilities$over_under_72 == "Over 72"
+```{r over_72_natl, echo=FALSE, message=FALSE, warning=FALSE,}
 
 over_72_adp <- facilities %>% 
   filter(!is.null(over_under_72)) %>%
@@ -711,7 +760,7 @@ b4
 
 Note expansion of "Over 72" ADP in Atlanta 'ATL', San Antonio 'SNA' AORs; more booked in at "Under 72" facilities in DAL, PHO, SND: 
 
-```{r over_72_adp_aor, echo=FALSE, message=FALSE, warning=FALSE,}
+```{r over_72_aor, echo=FALSE, message=FALSE, warning=FALSE,}
 
 over_72_adp_aor <- facilities %>% 
   filter(!is.null(over_under_72)) %>% 
@@ -773,16 +822,55 @@ p2 <- ggplot(data = over_72_bookins_aor,
 
 p2
 
+data <- facilities %>% 
+  select(c('over_72', 'aor', contains('adp'), -contains('bookin'))) %>% 
+    pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+data$fy <- data$fy %>% str_replace_all('[aA-zZ]', '')
+data$fy <- paste('20', data$fy, sep='')
+data$fy <- as.integer(data$fy) 
+
+b5 <- data %>% 
+  ggplot(aes(x = over_72,
+      y = log(adp),
+      fill = over_72)) +
+  geom_boxplot() +
+  facet_wrap(~aor)
+
+b5
+
+data <- facilities %>% 
+  select(c('over_72', 'aor', contains("bookins"), -contains("adp"), -contains("initial"))) %>% 
+    pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
+data$fy <- data$fy %>% str_replace_all('[aA-zZ]', '')
+data$fy <- paste('20', data$fy, sep='')
+data$fy <- as.integer(data$fy) 
+
+b6 <- data %>% 
+  ggplot(aes(x = over_72,
+      y = log(bookins),
+      fill = over_72)) +
+  geom_boxplot() +
+  facet_wrap(~aor)
+
+b6
+
 ```
 
 Comparing sampled facilities (DMCP-authorized, Over-72 hour) versus non-sampled facilities:
 
 ```{r sample_comparison, echo=FALSE, message=FALSE, warning=FALSE,}
-
-sample <- dmcp %>%
-  filter(over_under_72 == "Over 72")
-
-facilities$sample <-facilities$detloc %in% sample$detloc
 
 sample_adp <- facilities %>% 
   group_by(sample) %>% 
@@ -886,11 +974,11 @@ data$fy <- paste('20', data$fy, sep='')
 data$fy <- as.integer(data$fy) 
 
 b1 <- data %>% 
-  # filter(fy %in% c(10, 12, 14, 16, 18)) %>% 
-  ggplot(aes(x = factor(fy),
-      y = adp,
+  ggplot(aes(x = sample,
+      y = log(adp),
       fill = sample)) +
-  geom_boxplot()
+  geom_boxplot() +
+  facet_wrap(~fy)
 
 b1
 
@@ -908,11 +996,11 @@ data$fy <- paste('20', data$fy, sep='')
 data$fy <- as.integer(data$fy) 
 
 b2 <- data %>% 
-  # filter(fy %in% c(10, 12, 14, 16, 18)) %>% 
-  ggplot(aes(x = factor(fy),
-      y = bookins,
+  ggplot(aes(x = sample,
+      y = log(bookins),
       fill = sample)) +
-  geom_boxplot()
+  geom_boxplot() +
+  facet_wrap(~fy)
 
 b2
 
@@ -939,7 +1027,7 @@ data$fy <- as.integer(data$fy)
 b1 <- data %>% 
   filter(fy %in% c(10, 12, 14, 16, 18)) %>% 
   ggplot(aes(x = factor(fy),
-      y = adp,
+      y = log(adp),
       fill = aor)) +
   geom_boxplot() +
   facet_wrap(~aor)
