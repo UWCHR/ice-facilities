@@ -7,3 +7,4 @@ analyze/output/figures/*
 .DS_Store
 .Rproj.user
 *.Rproj
+*.html
