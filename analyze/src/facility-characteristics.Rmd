@@ -3,18 +3,13 @@ title: "facility-characteristics"
 author: "PN, UWCHR"
 date: "2/12/2021"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
-Analyzing detention facility population by facility characteristic: "AS NEEDED" facilities; DMCP-authorized facilities; "Over-72" hour facilities. 
+Descriptive analysis of detention facility population by facility characteristic: "AS NEEDED" facilities; DMCP-authorized facilities; "Over-72" hour facilities. 
 
-Starting with annual ADP. Recall that ADP does not equate to number of people passing through facility. Check book-ins along same lines.
-
-To-do:
-- [ ] Population measures by contract type/jurisdiction (may require light cleaning)
-- [X] Book-ins, initial book-ins measures by facility characteristic
-- [X] Compare measures for sampled facilities versus non-sampled facilities
+Concludes with descriptive analysis of sampled versus non-sampled facilities. Sample includes non-ORR, DMCP-authorized, "Over-72" hour facilities.
 
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # A few of these redundant
@@ -92,7 +87,9 @@ facilities <- facilities %>%
 
 ```
 
-"AS NEEDED" facilities, though more common overall than facilities with known ICE capacity, held a smaller and diminishing portion of detained people by total average ADP over the period from FY2009 - FY2018; most book-ins also at facilities with known ICE capacity (note total book-ins may double-count people due to facilty transfers):
+## AS NEEDED
+
+"AS NEEDED" facilities, though more common overall than facilities with known ICE capacity, held a smaller and diminishing portion of detained people by total average ADP over the period from FY2009 - FY2018; most book-ins also at facilities with known ICE capacity (note total book-ins may double-count people due to facility transfers):
 
 ```{r as_needed_natl, echo=FALSE, message=FALSE, warning=FALSE,}
 
@@ -406,6 +403,8 @@ p2
 
 ```
 
+## DMCP-Authorized
+
 DMCP-authorized facilities held/booked more and increasing number of detained people:
 
 ```{r dmcp_natl, echo=FALSE, message=FALSE, warning=FALSE,}
@@ -558,6 +557,10 @@ dmcp_bookins$fy <- dmcp_bookins$fy %>% str_replace_all('[aA-zZ]', '')
 dmcp_bookins$fy <- paste('20', dmcp_bookins$fy, sep='')
 dmcp_bookins$fy <- as.integer(dmcp_bookins$fy) 
 
+dmcp_bookins_aor$fy <- dmcp_bookins_aor$fy %>% str_replace_all('[aA-zZ]', '')
+dmcp_bookins_aor$fy <- paste('20', dmcp_bookins_aor$fy, sep='')
+dmcp_bookins_aor$fy <- as.integer(dmcp_bookins_aor$fy) 
+
 p1 <- ggplot(data = dmcp_adp_aor,
        aes(x = fy, 
            y = adp, 
@@ -633,6 +636,8 @@ b6 <- data %>%
 b6
 
 ```
+
+## Over-72 hour
 
 Greater and slightly-increasing proportion of ADP in "Over 72" facilities. More bookins in "Over 72" facilities as well.
 
@@ -868,6 +873,8 @@ b6
 
 ```
 
+## Sample
+
 Comparing sampled facilities (DMCP-authorized, Over-72 hour) versus non-sampled facilities:
 
 ```{r sample_comparison, echo=FALSE, message=FALSE, warning=FALSE,}
@@ -958,7 +965,7 @@ p3
 
 ```
 
-```{r boxplot_sample}
+```{r boxplot_sample, echo=FALSE, message=FALSE, warning=FALSE}
 
 data <- facilities %>% 
   select(c('detloc', 'aor', 'sample', contains('adp'), -contains('bookin'))) %>% 
@@ -1008,7 +1015,7 @@ b2
 
 Lots of AORs low median ADP with big facilities as outliers. Is this a problem?
 
-```{r boxplot_per_aor}
+```{r boxplot_per_aor, echo=FALSE, message=FALSE, warning=FALSE}
 
 data <- facilities %>% 
   filter(sample == TRUE) %>% 

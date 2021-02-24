@@ -5,6 +5,8 @@ date: "2/19/2021"
 output: html_document
 ---
 
+Descriptive analysis of ICE detention statistics based on facility type.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -19,6 +21,8 @@ library(yaml)
 library(here)
 library(assertr)
 library(ggrepel)
+library(ggalt)
+
 ```
 
 ```{r load_files, echo=FALSE, message=FALSE, warning=FALSE,}
@@ -96,6 +100,11 @@ data <- facilities %>%
     values_drop_na = TRUE
   )
 
+data$fy <- data$fy %>% str_replace_all('[aA-zZ]', '')
+data$fy <- paste('20', data$fy, sep='')
+data$fy <- as.integer(data$fy) 
+
+
 p1 <- data %>%
   ggplot(
        aes(x = fy, 
@@ -124,6 +133,10 @@ data <-  facilities %>%
     values_drop_na = TRUE
   )
 
+data$fy <- data$fy %>% str_replace_all('[aA-zZ]', '')
+data$fy <- paste('20', data$fy, sep='')
+data$fy <- as.integer(data$fy) 
+
 p1 <- data %>%
   ggplot(
        aes(x = fy, 
@@ -137,6 +150,8 @@ p1 <- data %>%
 p1
 
 ```
+
+Similar trends for initial bookins:
 
 ```{r type_initial_bookins, echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -150,6 +165,10 @@ data <-  facilities %>%
     values_drop_na = TRUE
   )
 
+data$fy <- data$fy %>% str_replace_all('[aA-zZ]', '')
+data$fy <- paste('20', data$fy, sep='')
+data$fy <- as.integer(data$fy) 
+
 p1 <- data %>%
   ggplot(
        aes(x = fy, 
@@ -163,12 +182,15 @@ p1 <- data %>%
 p1
 
 ```
-This scatter plot may not be appropriate since bookins are cumulative and drop off in FY18:
+
+Scatter plot of yearly observations of ADP, bookins per detention facility. Shows clear groupings of specific kinds of facilities, likely log linear relationship overall between ADP, bookings.
+
+Interesting to consider which kinds of facilities play which role in different AORs, for example, see plot 3: high-ADP, high-bookins quadrant represented by contract detention facilities in SEA, DEN; service processing centers in BUF; BOP and IGSA facilities in NYC; IGSA facilities tend to play flexible role in many AORs.
 
 ```{r type_adp_bookins, echo=FALSE, message=FALSE, warning=FALSE}
 
 data_adp <- facilities %>%
-  select(c('detloc', 'type', contains('adp'), -contains('bookin'))) %>% 
+  select(c('detloc', 'aor', 'type', contains('adp'), -contains('bookin'))) %>% 
   pivot_longer(
     cols = starts_with("fy"),
     names_to = "fy",
@@ -181,7 +203,7 @@ data_adp$fy <- paste('20', data_adp$fy, sep='')
 data_adp$fy <- as.integer(data_adp$fy) 
 
 data_bookins <- facilities %>%
-  select(c('detloc', 'type', contains("bookins"), -contains("adp"), -contains("initial"))) %>% 
+  select(c('detloc', 'aor', 'type', contains("bookins"), -contains("adp"), -contains("initial"))) %>% 
   pivot_longer(
     cols = starts_with("fy"),
     names_to = "fy",
@@ -193,15 +215,108 @@ data_bookins$fy <- data_bookins$fy %>% str_replace_all('[aA-zZ]', '')
 data_bookins$fy <- paste('20', data_bookins$fy, sep='')
 data_bookins$fy <- as.integer(data_bookins$fy) 
 
-data <- merge(data_adp, data_bookins, by=c('detloc', 'type', 'fy'))
+data <- merge(data_adp, data_bookins, by=c('detloc', 'aor', 'type', 'fy'))
 
 p1 <- data %>% 
   ggplot(aes(
-    x = adp,
-    y = bookins,
-    color = type
+    x = log(adp),
+    y = log(bookins),
+    color = type,
+    shape = factor(fy)
   )) +
-  geom_point()
+  geom_point() +
+  geom_encircle(aes(group=type)) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
 
 p1
+
+p2 <- data %>% 
+  ggplot(aes(
+    x = log(adp),
+    y = log(bookins),
+    color = type,
+    shape = factor(fy)
+  )) +
+  geom_point() +
+  facet_wrap(~aor) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+p2
+
+
+p3 <- data %>% 
+  ggplot(aes(
+    x = log(adp),
+    y = log(bookins),
+    color = type,
+    shape = factor(fy)
+  )) +
+  geom_encircle(aes(group=type, fill=type), alpha=.5) +
+  facet_wrap(~aor) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+p3
+```
+
+ADP and bookins trends per AOR. Note AORs where most active facility type has changed: IGSAs become more prominent in SNA, SFR, WAS; contract detention facilities become more prominent in SND.
+
+```{r per_aor, echo=FALSE, message=FALSE, warning=FALSE}
+
+data_bookins <- facilities %>%
+  group_by(aor, type) %>% 
+  summarize_at(vars(contains("bookins"), -contains("adp"), -contains("initial")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "bookins",
+    values_drop_na = TRUE
+  )
+
+data_adp <- facilities %>%
+  group_by(aor, type) %>% 
+  summarize_at(vars(ends_with("adp"), -contains("bookin")), sum) %>%
+  pivot_longer(
+    cols = starts_with("fy"),
+    names_to = "fy",
+    values_to = "adp",
+    values_drop_na = TRUE
+  )
+
+data_bookins$fy <- data_bookins$fy %>% str_replace_all('[aA-zZ]', '')
+data_bookins$fy <- paste('20', data_bookins$fy, sep='')
+data_bookins$fy <- as.integer(data_bookins$fy) 
+
+data_adp$fy <- data_adp$fy %>% str_replace_all('[aA-zZ]', '')
+data_adp$fy <- paste('20', data_adp$fy, sep='')
+data_adp$fy <- as.integer(data_adp$fy) 
+
+p1 <- data_adp %>%
+  ggplot(
+       aes(x = fy, 
+           y = adp, 
+           group = type, 
+           color = type)) + 
+  geom_line() +
+  facet_wrap(~aor) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+p1
+
+p2 <- data_bookins %>%
+  ggplot(
+       aes(x = fy, 
+           y = bookins, 
+           group = type, 
+           color = type)) + 
+  geom_line() +
+  facet_wrap(~aor) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, size = 8, vjust = .5))
+
+p2
+
 ```
