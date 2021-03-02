@@ -7,6 +7,10 @@ output: html_document
 
 Descriptive analysis of ICE detention statistics based on facility type.
 
+Next steps:
+- Refine facility typology (public/private, etc.)
+- Compare sampled/not sampled facility characteristics
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -219,8 +223,8 @@ data <- merge(data_adp, data_bookins, by=c('detloc', 'aor', 'type', 'fy'))
 
 p1 <- data %>% 
   ggplot(aes(
-    x = log(adp),
-    y = log(bookins),
+    x = adp,
+    y = bookins,
     color = type,
     shape = factor(fy)
   )) +

@@ -11,6 +11,11 @@ Descriptive analysis of detention facility population by facility characteristic
 
 Concludes with descriptive analysis of sampled versus non-sampled facilities. Sample includes non-ORR, DMCP-authorized, "Over-72" hour facilities.
 
+Next steps:
+- Ask partners about shift in detention characteristics from FY10-11 onward.
+- Statistical test of sample validity
+- Drop 0 observation facilities?
+
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # A few of these redundant
 library(tidyverse)
@@ -641,7 +646,9 @@ b6
 
 Greater and slightly-increasing proportion of ADP in "Over 72" facilities. More bookins in "Over 72" facilities as well.
 
-Should do some more checking for what facilities with null values in `over_under_72` represent:
+Next steps:
+- What do facilities with null values in `over_under_72` represent?
+- What are under-72 outliers with high ADP?
 
 ```{r over_72_natl, echo=FALSE, message=FALSE, warning=FALSE,}
 
