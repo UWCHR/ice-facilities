@@ -18,7 +18,7 @@ library(assertr)
 library(ggrepel)
 ```
 
-```{r load_files, echo=FALSE}
+```{r load_files, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 
 arrests <- read_delim(
   here::here('analyze', 'input', 'arrests.csv.gz'), 
@@ -47,7 +47,7 @@ county_aor <- read_delim(
 ```
 
 
-```{r facil_data_setup_and_filter, message=FALSE, warning=FALSE}
+```{r facil_data_setup_and_filter, echo=FALSE, message=FALSE, warning=FALSE}
 
 # Dropping ORR facilities
 # facilities <- facilities %>% 
@@ -101,7 +101,7 @@ facilities <- facilities %>%
 ```
 
 
-```{r enforcement_data_setup}
+```{r enforcement_data_setup, echo=FALSE, message=FALSE, warning=FALSE}
 
 # This could be moved into a loop
 
@@ -205,7 +205,7 @@ removals$departed_fy <- as.integer(removals$departed_fy)
 ```
 
 
-``` {r group_arrests}
+``` {r group_arrests, echo=FALSE, message=FALSE, warning=FALSE}
 
 # group arrests by aor
 aor_arrests <- arrests %>%
@@ -221,6 +221,14 @@ aor_encounters <- encounters %>%
   summarize(n_encounters = n()) %>% 
   rename(
     fy = event_fy
+  )
+
+# group removals by aor
+aor_removals <- removals %>%
+  group_by(aor, departed_fy) %>% 
+  summarize(n_removals = n()) %>% 
+  rename(
+    fy = departed_fy
   )
 
 # group county pop by aor
@@ -246,20 +254,23 @@ aor_adp$fy <- aor_adp$fy %>% str_replace_all('[aA-zZ]', '')
 aor_adp$fy <- paste('20', aor_adp$fy, sep='')
 aor_adp$fy <- as.integer(aor_adp$fy) 
 
-aor_arrests_adp <- merge(aor_arrests, aor_adp, by=c('aor', 'fy'))
+aor_enforce_adp <- merge(aor_arrests, aor_adp, by=c('aor', 'fy'))
 
-aor_enforce_adp <- merge(aor_arrests_adp, aor_encounters, by=c('aor', 'fy'))
+aor_enforce_adp <- merge(aor_enforce_adp, aor_encounters, by=c('aor', 'fy'))
+
+aor_enforce_adp <- merge(aor_enforce_adp, aor_removals, by=c('aor', 'fy'))
 
 aor_enforce_adp <- merge(aor_enforce_adp, aor_pop, by='aor')
 
 aor_enforce_adp$adp_per_capita = aor_enforce_adp$adp / aor_enforce_adp$population
 aor_enforce_adp$arrests_per_capita = aor_enforce_adp$n_arrests / aor_enforce_adp$population
 aor_enforce_adp$encounters_per_capita = aor_enforce_adp$n_encounters / aor_enforce_adp$population
+aor_enforce_adp$removals_per_capita = aor_enforce_adp$n_removals / aor_enforce_adp$population
 
 
 ```
 
-```{r plot_arrests_adp_per_capita}
+```{r plot_arrests_adp_per_capita, echo=FALSE, message=FALSE, warning=FALSE}
 
 # This might be a better labelling solution but doesn't use ggplot
 # https://europebynumbers.wordpress.com/2019/11/21/how-to-label-points-on-a-scatterplot-with-r-for-lattice/
@@ -268,7 +279,9 @@ aor_enforce_adp$encounters_per_capita = aor_enforce_adp$n_encounters / aor_enfor
 # library(latticetools)
 
 p <- aor_enforce_adp %>% 
-  ggplot(aes(x = adp_per_capita, y = arrests_per_capita, colour=aor, label=aor)) +
+  ggplot(aes(
+    x = log(adp_per_capita),
+    y = log(arrests_per_capita), colour=aor, label=aor)) +
   geom_point()
 
 directlabels::direct.label(p, 'extreme.points')
@@ -291,26 +304,83 @@ xyplot(arrests_per_capita ~ adp_per_capita, aor_enforce_adp,
 
 ```
 
-```{r plot_encounters_adp_per_capita}
+```{r plot_arrests_adp_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
-aor_enforce_adp %>% 
+p <- aor_enforce_adp %>% 
   ggplot(aes(x = adp_per_capita, y = arrests_per_capita, colour=aor, label=aor)) +
   geom_point()
 
+directlabels::direct.label(p, 'extreme.points')
+
+
 ```
 
-```{r plot_encounters_adp_per_capita}
+```{r plot_encounters_adp_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
-aor_enforce_adp %>% 
+p <- aor_enforce_adp %>% 
   ggplot(aes(x = adp_per_capita, y = encounters_per_capita, colour=aor, label=aor)) +
   geom_point()
 
+directlabels::direct.label(p, 'extreme.points')
+
 ```
 
-```{r plot_encounters_arrests_per_capita}
+```{r plot_removals_adp_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
-aor_enforce_adp %>% 
+p <- aor_enforce_adp %>% 
+  ggplot(aes(x = adp_per_capita, y = removals_per_capita, colour=aor, label=aor)) +
+  geom_point()
+
+directlabels::direct.label(p, 'extreme.points')
+
+```
+
+```{r plot_removals_arrests_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
+
+p <- aor_enforce_adp %>% 
+  ggplot(aes(x = arrests_per_capita, y = removals_per_capita, colour=aor, label=aor)) +
+  geom_point()
+
+directlabels::direct.label(p, 'extreme.points')
+
+```
+
+```{r plot_encounters_arrests_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
+
+p <- aor_enforce_adp %>% 
   ggplot(aes(x = arrests_per_capita, y = encounters_per_capita, colour=aor, label=aor)) +
   geom_point()
+
+directlabels::direct.label(p, 'extreme.points')
+
+```
+
+```{r removal_adp_lm}
+
+model1 <- lm(removals_per_capita ~ adp_per_capita, data = aor_enforce_adp)
+
+
+summary(model1)
+print(model1$coefficients)
+
+```
+
+```{r arrests_adp_lm}
+
+model1 <- lm(arrests_per_capita ~ adp_per_capita, data = aor_enforce_adp)
+
+
+summary(model1)
+print(model1$coefficients)
+
+```
+
+```{r encounters_adp_lm}
+
+model1 <- lm(encounters_per_capita ~ adp_per_capita, data = aor_enforce_adp)
+
+
+summary(model1)
+print(model1$coefficients)
 
 ```
