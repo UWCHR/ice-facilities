@@ -5,6 +5,10 @@ date: "1/15/2021"
 output: html_document
 ---
 
+# Preliminary analysis of population-weighted detention & enforcement metrics
+
+Note this is using a single 5-year ACS population estimate for each AOR in 2018, constructed from mapping of counties to AORs in `county_aor.R`.
+
 ```{r setup, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 library(tidyverse)
 library(here)
@@ -270,6 +274,10 @@ aor_enforce_adp$removals_per_capita = aor_enforce_adp$n_removals / aor_enforce_a
 
 ```
 
+## Descriptive analysis
+
+Scatter plot of ADP per capita by arrests per capita; each observation is AOR/FY total. We see two clear groups of AORs: Southern border AORs have higher ADP and arrests per capita.
+
 ```{r plot_arrests_adp_per_capita, echo=FALSE, message=FALSE, warning=FALSE}
 
 # This might be a better labelling solution but doesn't use ggplot
@@ -304,6 +312,8 @@ xyplot(arrests_per_capita ~ adp_per_capita, aor_enforce_adp,
 
 ```
 
+Same plot as first above, but not logged, just as visual proof that log transformation does not change relationships between observations.
+
 ```{r plot_arrests_adp_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
 p <- aor_enforce_adp %>% 
@@ -315,6 +325,8 @@ directlabels::direct.label(p, 'extreme.points')
 
 ```
 
+Slightly different apparent relationship between ecncounters and ADP: note high rate of encounters per capita in NYC.
+
 ```{r plot_encounters_adp_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
 p <- aor_enforce_adp %>% 
@@ -324,6 +336,8 @@ p <- aor_enforce_adp %>%
 directlabels::direct.label(p, 'extreme.points')
 
 ```
+
+Very strong relationship between removals and ADP per capita; high ADP facilities on southern U.S. border likely used as staging for deportations.
 
 ```{r plot_removals_adp_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -335,6 +349,8 @@ directlabels::direct.label(p, 'extreme.points')
 
 ```
 
+Notable disjunction in trend of removals versus arrests per capita. Southern border AORs have higher rates of both but wide spread; close but weakly positive (?) relationship for other AORs.
+
 ```{r plot_removals_arrests_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
 p <- aor_enforce_adp %>% 
@@ -344,6 +360,8 @@ p <- aor_enforce_adp %>%
 directlabels::direct.label(p, 'extreme.points')
 
 ```
+
+Again note high rate of encounters in NYC, LOS versus rate of arrests. Suggestive of dragnet-style operations with high community impact, low enforcement outcomes?
 
 ```{r plot_encounters_arrests_per_capita_simple, echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -355,6 +373,10 @@ directlabels::direct.label(p, 'extreme.points')
 
 ```
 
+## Simple regressions
+
+Strong, significant positive relationship between arrests per capita, ADP per capita. 
+
 ```{r removal_adp_lm}
 
 model1 <- lm(removals_per_capita ~ adp_per_capita, data = aor_enforce_adp)
@@ -364,6 +386,8 @@ summary(model1)
 print(model1$coefficients)
 
 ```
+
+Weaker, significant relationship between arrests per capita, ADP per capita.
 
 ```{r arrests_adp_lm}
 
@@ -375,6 +399,8 @@ print(model1$coefficients)
 
 ```
 
+Significant relationship between encounters, ADP per capita.
+
 ```{r encounters_adp_lm}
 
 model1 <- lm(encounters_per_capita ~ adp_per_capita, data = aor_enforce_adp)
@@ -384,3 +410,41 @@ summary(model1)
 print(model1$coefficients)
 
 ```
+
+Combining multiple independent variables: significant relationship between removals, ADP; arrests not signficant.
+
+```{r removals_arrests_adp_lm}
+
+model1 <- lm(removals_per_capita ~ adp_per_capita + arrests_per_capita, data = aor_enforce_adp)
+
+
+summary(model1)
+print(model1$coefficients)
+
+```
+
+Other direction same result: removals signficant, arrests not.
+
+```{r adp_removals_arrests_lm}
+
+model1 <- lm(adp_per_capita ~ removals_per_capita + arrests_per_capita, data = aor_enforce_adp)
+
+
+summary(model1)
+print(model1$coefficients)
+
+```
+
+Both arrests significant relationship with ADP, but encounters not significant:
+
+```{r adp_encounters_arrests_lm}
+
+model1 <- lm(adp_per_capita ~ encounters_per_capita + arrests_per_capita, data = aor_enforce_adp)
+
+
+summary(model1)
+print(model1$coefficients)
+
+```
+
+
