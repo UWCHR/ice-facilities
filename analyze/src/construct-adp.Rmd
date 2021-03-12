@@ -1,0 +1,185 @@
+---
+title: "construct-adp"
+author: "UWCHR"
+date: "3/12/2021"
+output: html_document
+---
+
+Constructing ADP "capacity" measure for all sampled facilities.
+
+Data source: ICE facilities report `ICE_Facility_List_11-06-2017-web.xlsx` released by NIJC.
+
+Next steps:
+- Compare "capacity" proxies with known capacity facilities
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# A few of these redundant
+library(tidyverse)
+library(here)
+library(lubridate)
+library(skimr)
+library(tigris)
+library(sf)
+library(yaml)
+library(here)
+library(assertr)
+library(ggrepel)
+library(ggalt)
+
+```
+
+```{r load_files, echo=FALSE, message=FALSE, warning=FALSE,}
+
+facilities <- read_delim(
+  here::here('analyze', 'input', 'facil-list.csv.gz'), 
+  delim = "|") 
+
+dmcp <- read_delim(
+  here::here('analyze', 'input', 'dmcp-detailed.csv.gz'), 
+  delim = "|") 
+
+```
+
+```{r facil_data_setup_and_filter, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Ideally specify field type on import
+facilities <- facilities %>%
+  mutate(detloc = as.factor(detloc))
+
+facilities <- facilities %>%
+  mutate(state = as.factor(state))
+
+facilities <- facilities %>%
+  mutate(city = as.factor(city))
+
+facilities <- facilities %>%
+  mutate(zip = as.factor(zip))
+
+facilities <- facilities %>%
+  mutate(aor = as.factor(aor))
+
+facilities <- facilities %>%
+  mutate(type = as.factor(type))
+
+dmcp <- dmcp %>%
+  mutate(state = as.factor(state),
+         aor = as.factor(aor),
+         detloc = as.factor(detloc))
+
+dmcp$over_under_72 <- as.factor(dmcp$over_under_72)
+
+facilities <- facilities %>%
+  filter(type != "ORR")
+
+facilities$as_needed <- facilities$capacity == 'AS NEEDED'
+
+facilities$dmcp <- facilities$detloc %in% dmcp$detloc
+
+facilities$over_72 <- facilities$over_under_72 == "Over 72"
+
+sample <- dmcp %>%
+  filter(over_under_72 == "Over 72")
+
+facilities$sample <-facilities$detloc %in% sample$detloc
+
+facilities <- facilities %>% 
+  filter(sample == TRUE)
+
+# Concatenate facility city and state columns
+facilities <- facilities %>% 
+  unite("city", c(city,state), sep = ", ", remove = FALSE, na.rm = FALSE) %>%
+  mutate(city = as.factor(city))
+
+```
+
+Constructing "capacity" proxy from ADP per FY based on FY18 max population.
+
+Note: ICE facilities dataset generated Nov. 2017, only accounts for first month of FY18
+
+```{r compare_adp_w_fy18_max_pop, echo=FALSE, message=FALSE, warning=FALSE}
+
+data <- facilities %>% 
+  select(c('detloc', 'aor', 'capacity', 'fy18_max_population_count', ends_with("adp"), -contains("bookin")))
+
+compare_fy18_max_pop <- function(x) (data$fy18_max_population_count - x)
+
+approach1 <- data %>% 
+  mutate(across(ends_with("adp"),
+                compare_fy18_max_pop,
+                .names = "compare_fy18_max_{col}"))
+
+```
+
+Constructing "capacity" proxy from ADP per FY based on max ADP observation.
+
+```{r compare_max_adp_ever, echo=FALSE, message=FALSE, warning=FALSE}
+
+data <- facilities %>% 
+  select(c('detloc', 'aor', 'capacity', 'fy18_max_population_count', ends_with("adp"), -contains("bookin")))
+
+data[, 'max_adp'] <- apply(data[5:14], 1, max)
+
+compare_max_adp_ever <- function(x) (data$max_adp - x)
+
+approach2 <- data %>% 
+  mutate(across(ends_with("adp"),
+                compare_max_adp_ever,
+                .names = "compare_max_adp_{col}")) %>% 
+  select(-compare_max_adp_max_adp)
+
+```
+
+```{r compare_approaches, echo=FALSE, message=FALSE, warning=FALSE}
+
+data <- merge(approach1, approach2[, c('detloc', 'aor', 'capacity', setdiff(colnames(approach2), colnames(approach1)))], by=c('detloc', 'aor', 'capacity'))
+
+approach1_data <- data %>%
+  group_by(aor) %>% 
+  summarize_at(vars(contains("compare_fy18_max")), sum) %>%
+  pivot_longer(
+    cols = starts_with("compare_fy18"),
+    names_to = "fy",
+    values_to = "max_versus_fy18",
+    values_drop_na = TRUE
+  )
+
+approach1_data$fy <- approach1_data$fy %>% str_replace_all('compare_fy18_max', '')
+approach1_data$fy <- approach1_data$fy %>% str_replace_all('[aA-zZ]', '')
+approach1_data$fy <- paste('20', approach1_data$fy, sep='')
+approach1_data$fy <- as.integer(approach1_data$fy)
+
+approach2_data <- data %>%
+  group_by(aor) %>% 
+  summarize_at(vars(contains("compare_max_adp")), sum) %>%
+  pivot_longer(
+    cols = starts_with("compare_max_adp"),
+    names_to = "fy",
+    values_to = "max_versus_adp_ever",
+    values_drop_na = TRUE
+  )
+
+approach2_data$fy <- approach2_data$fy %>% str_replace_all('[aA-zZ]', '')
+approach2_data$fy <- paste('20', approach2_data$fy, sep='')
+approach2_data$fy <- as.integer(approach2_data$fy)
+
+to_plot <- merge(approach1_data, approach2_data, by=c('aor', 'fy')) %>% 
+  pivot_longer(
+    cols = starts_with("max"),
+    names_to = "approach",
+    values_to = "capacity",
+    values_drop_na = TRUE
+  )
+
+p1 <- to_plot %>% 
+  ggplot(aes(x = fy,
+             y = capacity,
+             color = approach)) +
+  geom_line() +
+  facet_wrap(~aor)
+
+p1
+
+```
+
