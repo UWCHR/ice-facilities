@@ -274,3 +274,8 @@ p1
 
 ```
 
+```{r compare_baselines, echo=FALSE, message=FALSE, warning=FALSE}
+
+print(data[c('detloc', 'aor', 'capacity', 'fy18_max_population_count', 'max_adp')])
+
+```
