@@ -12,6 +12,7 @@ Data source: ICE facilities report `ICE_Facility_List_11-06-2017-web.xlsx` relea
 Next steps:
 - National level comparisons of approaches
 - Test for monthly ADP observations
+- Compare which "baseline" highest per facility/AOR
 - Combined approaches?
 - Statistical testing?
 
@@ -252,7 +253,7 @@ approach2_data$fy <- paste('20', approach2_data$fy, sep='')
 approach2_data$fy <- as.integer(approach2_data$fy)
 
 to_plot <- merge(approach1_data, approach2_data, by=c('aor', 'fy'))
-to_plot <- merge(to_plot, approach3_data, by=c('aor', 'fy'))
+to_plot <- merge(to_plot, approach3_data, by=c('aor', 'fy'))8_
 
 to_plot <- to_plot %>% 
   pivot_longer(
