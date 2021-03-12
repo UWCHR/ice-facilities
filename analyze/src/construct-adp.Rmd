@@ -5,12 +5,15 @@ date: "3/12/2021"
 output: html_document
 ---
 
-Constructing ADP "capacity" measure for all sampled facilities.
+Constructing ADP "capacity" proxy measure for all sampled facilities.
 
 Data source: ICE facilities report `ICE_Facility_List_11-06-2017-web.xlsx` released by NIJC.
 
 Next steps:
-- Compare "capacity" proxies with known capacity facilities
+- National level comparisons of approaches
+- Test for monthly ADP observations
+- Combined approaches?
+- Statistical testing?
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -131,9 +134,93 @@ approach2 <- data %>%
 
 ```
 
+Comparing first two capacity proxy approaches for all sampled facilities. Trends are parallel because we are deciding where to set "capacity" baseline versus same sets of yearly ADP observations. Note variation: "versus max ADP ever" approach is usually a higher baseline, which makes sense, but sometimes it's lower or approaches very similar. What would this look like at national level?
+
 ```{r compare_approaches, echo=FALSE, message=FALSE, warning=FALSE}
 
+# There's probably a more streamlined way to do this (ignoring duplicate fields in approach2)
 data <- merge(approach1, approach2[, c('detloc', 'aor', 'capacity', setdiff(colnames(approach2), colnames(approach1)))], by=c('detloc', 'aor', 'capacity'))
+
+approach1_data <- data %>%
+  group_by(aor) %>% 
+  summarize_at(vars(contains("compare_fy18_max")), sum) %>%
+  pivot_longer(
+    cols = starts_with("compare_fy18"),
+    names_to = "fy",
+    values_to = "versus_fy18_max",
+    values_drop_na = TRUE
+  )
+
+approach1_data$fy <- approach1_data$fy %>% str_replace_all('compare_fy18_max', '')
+approach1_data$fy <- approach1_data$fy %>% str_replace_all('[aA-zZ]', '')
+approach1_data$fy <- paste('20', approach1_data$fy, sep='')
+approach1_data$fy <- as.integer(approach1_data$fy)
+
+approach2_data <- data %>%
+  group_by(aor) %>% 
+  summarize_at(vars(contains("compare_max_adp")), sum) %>%
+  pivot_longer(
+    cols = starts_with("compare_max_adp"),
+    names_to = "fy",
+    values_to = "versus_max_adp_ever",
+    values_drop_na = TRUE
+  )
+
+approach2_data$fy <- approach2_data$fy %>% str_replace_all('[aA-zZ]', '')
+approach2_data$fy <- paste('20', approach2_data$fy, sep='')
+approach2_data$fy <- as.integer(approach2_data$fy)
+
+to_plot <- merge(approach1_data, approach2_data, by=c('aor', 'fy')) %>% 
+  pivot_longer(
+    cols = contains("max"),
+    names_to = "approach",
+    values_to = "capacity",
+    values_drop_na = TRUE
+  )
+
+p1 <- to_plot %>% 
+  ggplot(aes(x = fy,
+             y = capacity,
+             color = approach)) +
+  geom_line() +
+  facet_wrap(~aor)
+
+p1
+
+```
+
+Comparing first two capacity proxies with reported Nov. 2017 capacity where known, excluding "AS NEEDED" facilities. Known capacity tends to be higher baseline than either capacity proxy, farthest off in HOU, ELP, PHO.
+
+```{r compare_approaches_known_capacity, echo=FALSE, message=FALSE, warning=FALSE}
+
+# There's probably a more streamlined way to do this (ignoring duplicate fields in approach2)
+data <- merge(approach1, approach2[, c('detloc', 'aor', 'capacity', setdiff(colnames(approach2), colnames(approach1)))], by=c('detloc', 'aor', 'capacity')) %>% 
+  filter(capacity != "AS NEEDED")
+
+data$capacity <- as.integer(data$capacity)
+
+compare_capacity <- function(x) (data$capacity - x)
+
+data <- data %>% 
+  mutate(across(c(ends_with("adp"), -contains("compare"), -contains("max")),
+                compare_capacity,
+                .names = "compare_capacity_{col}"))
+
+approach3_data <- data %>%
+  group_by(aor) %>% 
+  summarize_at(vars(contains("compare_capacity")), sum) %>%
+  pivot_longer(
+    cols = starts_with("compare_capacity"),
+    names_to = "fy",
+    values_to = "versus_capacity",
+    values_drop_na = TRUE
+  )
+
+approach3_data$fy <- approach3_data$fy %>% str_replace_all('[aA-zZ]', '')
+approach3_data$fy <- paste('20', approach3_data$fy, sep='')
+approach3_data$fy <- as.integer(approach3_data$fy)
+
+# Refreshing previous approaches filtering out "AS NEEDED"
 
 approach1_data <- data %>%
   group_by(aor) %>% 
@@ -164,9 +251,12 @@ approach2_data$fy <- approach2_data$fy %>% str_replace_all('[aA-zZ]', '')
 approach2_data$fy <- paste('20', approach2_data$fy, sep='')
 approach2_data$fy <- as.integer(approach2_data$fy)
 
-to_plot <- merge(approach1_data, approach2_data, by=c('aor', 'fy')) %>% 
+to_plot <- merge(approach1_data, approach2_data, by=c('aor', 'fy'))
+to_plot <- merge(to_plot, approach3_data, by=c('aor', 'fy'))
+
+to_plot <- to_plot %>% 
   pivot_longer(
-    cols = starts_with("max"),
+    cols = c("versus_capacity", "max_versus_fy18", "max_versus_adp_ever"),
     names_to = "approach",
     values_to = "capacity",
     values_drop_na = TRUE
