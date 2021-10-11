@@ -16,9 +16,9 @@ library(dplyr)
 
 
 ```{r}
-facilities <- read.csv("facil-list.csv", sep = "|")
-dmcp <- read.csv("dmcp-detailed.csv", sep = "|")
-new_facilities <- read.csv("to_research.csv")
+facilities <- read.csv("../input/facil-list.csv.gz", sep = "|")
+dmcp <- read.csv("../input/dmcp-detailed.csv.gz", sep = "|")
+new_facilities <- read.csv("../hand/to_research.csv")
 
 facilities_clean <- facilities %>% select(1:12)
 new_facilities_clean <- new_facilities %>% select(1:7) %>%
@@ -40,5 +40,6 @@ dmcp_clean <- dmcp %>% select(detloc, over_under_72) %>%
 ```{r}
 facilities_clean <- merge(facilities_clean, dmcp_clean, by = "detloc")
 facilities_both <- bind_rows(facilities_clean, new_facilities_clean)
+write.csv(facilities_both, "../output/facilities.csv")
 ```
 
