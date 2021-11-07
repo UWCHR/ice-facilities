@@ -9,6 +9,6 @@
 - For `circuit` column: 
   - [SCOTUS Circuit Assignments](https://www.supremecourt.gov/about/circuitassignments.aspx)
 - For `over_72` column: 
-  - [ICE Detention Statistics](https://www.ice.gov/doclib/detention/Over72HourFacilities.xlsx)
+  - [ICE Detention Statistics - Over-72-Hour Facilities](https://www.ice.gov/doclib/detention/Over72HourFacilities.xlsx)
 - Most columns and info from other sources were taken from and compared with:
-  - [ICE Detention Statistics FY 2021 Report]
+  - [ICE Detention Statistics - FY21_detentionStats07082021.xlsx](https://github.com/UWCHR/ice-facilities/files/7491684/FY21_detentionStats07082021.xlsx)
