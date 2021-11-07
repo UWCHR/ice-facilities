@@ -6,13 +6,16 @@ facilities <- read.csv("../input/facil-list.csv.gz", sep = "|")
 new_facilities <- read.csv("../hand/to_research.csv")
 
 #Data cleaning
-facilities_clean <- facilities %>% select(1:12, authorizing_authority, over_under_72, capacity) %>% filter(detloc != "Redacted") %>%
+facilities_clean <- facilities %>% select(1:12, authorizing_authority, over_under_72, capacity, guaranteed_minimum) %>% filter(detloc != "Redacted") %>%
   mutate(over_72 = case_when(over_under_72 == "Over 72" ~ TRUE,
                              over_under_72 == "Under 72" ~ FALSE,
                              TRUE ~ NA)) %>%
   select(-over_under_72)
 
-new_facilities_clean <- new_facilities %>% select(1:8) %>%
+#str(facilities_clean)
+facilities_clean$capacity <- as.numeric(facilities_clean$capacity)
+
+new_facilities_clean <- new_facilities %>% select(1:14, 16:17) %>%
   rename(detloc = detention_facility_code,
          name = detention_facility,
          type = contract) %>%
@@ -20,6 +23,9 @@ new_facilities_clean <- new_facilities %>% select(1:8) %>%
   select(-rec_count) %>%
   mutate(over_72 = case_when(over_72 == "Y" ~ TRUE,
                              TRUE ~ FALSE))
+
+#str(new_facilities_clean)
+new_facilities_clean$zip <- as.factor(new_facilities_clean$zip)
 
 #Joining
 facilities_both <- bind_rows(facilities_clean, new_facilities_clean) %>%
