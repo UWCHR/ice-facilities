@@ -1,5 +1,7 @@
 # Sources for ice-facilities characteristics
 
+Data in ice-facilities/hand/to_research.csv, which is a file containing information for "new" detention facilities (in use from 2017), comes from:
+
 - For `aor` (Area of Responsiblity) column: 
   - [ICE Dentention Facilities website](https://www.ice.gov/detention-facilities)
   - [ACLU's "Justice-Free Zones" report](https://www.aclu.org/report/justice-free-zones-us-immigration-detention-under-trump-administration), Appendix p. 60-61
