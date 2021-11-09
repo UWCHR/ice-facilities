@@ -2,9 +2,11 @@
 
 - For `aor` (Area of Responsiblity) column: 
   - [ICE Dentention Facilities website](https://www.ice.gov/detention-facilities)
-  - [ACLU's "Justice-Free Zones" report](https://www.aclu.org/report/justice-free-zones-us-immigration-detention-under-trump-administration): Appendix, page 60-61)
+  - [ACLU's "Justice-Free Zones" report](https://www.aclu.org/report/justice-free-zones-us-immigration-detention-under-trump-administration), Appendix p. 60-61
 - For addresses columns (`address`, `city`, `state`, `zip`), and some observations' `contract`, `type_detailed`, and `guaranteed_minimum`:
   - [TRAC Immigration](https://trac.syr.edu/immigration/detentionstats/facilities.html)
+- More on `guaranteed_minimum`:
+  - [DHS US Immigration and Customs Enforcement Budget Overview](https://www.dhs.gov/sites/default/files/publications/19_0318_MGMT_CBJ-Immigration-Customs-Enforcement_0.pdf), p. 145
 - For `county` column: Google results based on detailed address
 - For `circuit` column: 
   - [SCOTUS Circuit Assignments](https://www.supremecourt.gov/about/circuitassignments.aspx)
