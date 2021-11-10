@@ -13,7 +13,7 @@ facilities_clean <- facilities %>% select(1:12, authorizing_authority, over_unde
   select(-over_under_72)
 
 #str(facilities_clean)
-facilities_clean$capacity <- as.numeric(facilities_clean$capacity)
+facilities_clean$capacity <- as.numeric(as.character(facilities_clean$capacity))
 
 new_facilities_clean <- new_facilities %>% select(1:14, 16:17) %>%
   rename(detloc = detention_facility_code,
