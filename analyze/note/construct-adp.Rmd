@@ -10,11 +10,7 @@ Constructing ADP "capacity" proxy measure for all sampled facilities.
 Data source: ICE facilities report `ICE_Facility_List_11-06-2017-web.xlsx` released by NIJC.
 
 Next steps:
-- National level comparisons of approaches
-- Test for monthly ADP observations
-- Compare which "baseline" highest per facility/AOR
-- Combined approaches?
-- Statistical testing?
+- This work is picked up in `ice-quant` repo using full ICE detention headcount
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)

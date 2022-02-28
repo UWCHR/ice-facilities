@@ -45,7 +45,7 @@ dmcp <- read_delim(
   delim = "|") 
 
 county_aor <- read_delim(
-  here::here('analyze', 'output', 'county_aor.csv'), 
+  here::here('analyze', 'hand', 'county_aor.csv'), 
   delim = ",")
 
 ```
