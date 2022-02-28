@@ -27,6 +27,7 @@ new_facilities_clean <- new_facilities %>% select(1:14, 16:17) %>%
     select(-rec_count) %>%
     mutate(over_72 = case_when(over_72 == "Y" ~ TRUE,
                              TRUE ~ FALSE))
+
 new_facilities_clean$zip <- as.factor(new_facilities_clean$zip)
 
 #Joining
