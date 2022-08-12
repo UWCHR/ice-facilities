@@ -10,6 +10,7 @@ import pandas as pd
 import argparse
 import sys
 import yaml
+import logging
 if sys.version_info[0] < 3:
     raise "Must be using Python 3"
 
@@ -28,6 +29,11 @@ if __name__ == "__main__":
 
     args = _get_args()
 
+    logging.basicConfig(filename='output/clean.log',
+                    filemode='a',
+                    format=f'%(asctime)s|%(message)s',
+                    level=logging.INFO)
+
     read_csv_opts = {'sep': '|',
                      'quotechar': '"',
                      'compression': 'gzip',
@@ -36,24 +42,26 @@ if __name__ == "__main__":
 
     df = pd.read_csv(args.input, **read_csv_opts)
 
-    print(f'Cleaning {args.input}')
+    logging.info(f'input_file|{args.input}')
+    logging.info(f'rows_in|{len(df)}')
 
     with open(args.cleanrules, 'r') as yamlfile:
-        cleanrules = yaml.load(yamlfile)
+        cleanrules = yaml.safe_load(yamlfile)
 
     df.columns = df.columns.str.lower()
     df.columns = df.columns.str.strip()
     for key in cleanrules['all_cols'].keys():
-        df.columns = df.columns.str.replace(key, cleanrules['all_cols'][key])
+        df.columns = df.columns.str.replace(key, cleanrules['all_cols'][key],
+                                            regex=True)
 
     # Very basic cleaning here; should learn how to parse common
     # symbols in Pandas without replacing strings
     for col in df.columns:
         try:
             df.loc[:, col] = df.loc[:, col].astype(str)
-            df.loc[:, col] = df.loc[:, col].str.replace(',', '')
-            df.loc[:, col] = df.loc[:, col].str.replace('$', '')
-            df.loc[:, col] = df.loc[:, col].str.replace('%', '')
+            df.loc[:, col] = df.loc[:, col].str.replace(',', '', regex=True)
+            df.loc[:, col] = df.loc[:, col].str.replace('$', '', regex=True)
+            df.loc[:, col] = df.loc[:, col].str.replace('%', '', regex=True)
             df.loc[:, col] = df.loc[:, col].astype(float)
         except ValueError:
             pass
@@ -65,8 +73,7 @@ if __name__ == "__main__":
                       'index': False}
 
     df.to_csv(args.output, **write_csv_opts)
-    print(df.columns)
-    print(f'Wrote {len(df)} records to {args.output}')
-    print()
+    logging.info(f'output_file|{args.input}')
+    logging.info(f'rows_out|{len(df)}')
 
 # END.
