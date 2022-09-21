@@ -6,25 +6,29 @@
 # ice-facilities/join/src/join.R
 #
 
-library(tidyverse)
-library(here)
-library(logger)
+library(pacman)
+p_load(argparse, tidyverse, here, logger)
+
+parser <- ArgumentParser()
+parser$add_argument("--input", default = 'input/facil-list.csv.gz')
+parser$add_argument("--to_join", default = 'hand/new_facilities.csv')
+parser$add_argument("--logfile", default = 'output/join.log')
+parser$add_argument("--output", default = 'output/facilities.csv.gz') 
+args <- parser$parse_args()
 
 log_threshold(TRACE)
-
-log_appender(appender_file(here::here('join', 'output', 'join.log')))
-
+log_appender(appender_file(args$logfile))
 logger <- layout_glue_generator(format = '{time}|{msg}')
 log_layout(logger)
 
-facilities <- read_delim(here::here('join', 'input', 'facil-list.csv.gz'),
+facilities <- read_delim(args$input,
     delim = "|") 
 
 log_info('input_file|facil-list.csv.gz')
 rows_in <- nrow(facilities)
 log_info('rows_in|{rows_in}')
 
-new_facilities <- read_delim(here::here('join', 'hand', 'new_facilities.csv'),
+new_facilities <- read_delim(args$to_join,
     delim = ",")
 
 #Data cleaning
@@ -41,6 +45,8 @@ facilities_clean <- facilities %>%
                                over_under_72 == "Under 72" ~ FALSE,
                                TRUE ~ NA)) %>%
     select(-over_under_72)
+
+facilities_clean[facilities_clean == "nan"] <- NA
 
 post_drop <- nrow(facilities_clean)
 log_info('dropped_redacted|{rows_in - post_drop}')
@@ -64,18 +70,15 @@ log_info('under_50_pop_dropped|{pre_drop - post_drop}')
 new_facilities_clean$zip <- as.factor(new_facilities_clean$zip)
 
 #Joining
-facilities_both <- bind_rows(facilities_clean, new_facilities_clean) %>%
+df <- bind_rows(facilities_clean, new_facilities_clean) %>%
     mutate(dmcp_auth = case_when(authorizing_authority == "DMCP" ~ TRUE,
                                authorizing_authority %in% c("JFRMU", "OTHER", "BOP") ~ FALSE,
                                TRUE ~ NA))
 
-output_file <- facilities_both
-output_filename <- 'facilities.csv.gz'
-
-write_delim(output_file, here::here('join', 'output', output_filename),
+write_delim(df, args$output,
     delim='|')
 
-log_info('rows_out|{nrow(output_file)}')
-log_info('output_file|{output_filename}')
+log_info('rows_out|{nrow(df)}')
+log_info('output_file|{args$output}')
 
 # END.
