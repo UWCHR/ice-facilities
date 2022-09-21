@@ -17,7 +17,6 @@ if sys.version_info[0] < 3:
 
 def _get_args():
     parser = argparse.ArgumentParser()
-    # parser.add_argument("--facilities", required=True)
     parser.add_argument("--cleanrules", required=True)
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
@@ -51,11 +50,10 @@ if __name__ == "__main__":
     df.columns = df.columns.str.lower()
     df.columns = df.columns.str.strip()
     for key in cleanrules['all_cols'].keys():
-        df.columns = df.columns.str.replace(key, cleanrules['all_cols'][key],
+        df.columns = df.columns.str.replace(key, 
+                                            cleanrules['all_cols'][key],
                                             regex=True)
 
-    # Very basic cleaning here; should learn how to parse common
-    # symbols in Pandas without replacing strings
     for col in df.columns:
         try:
             df.loc[:, col] = df.loc[:, col].astype(str)
