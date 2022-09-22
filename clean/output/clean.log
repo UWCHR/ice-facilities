@@ -1,8 +1,6 @@
-2022-09-21 16:12:26,830|input_file|input/ICEFacilityListReport.csv.gz
-2022-09-21 16:12:26,830|rows_in|1685
-2022-09-21 16:12:27,620|output_file|input/ICEFacilityListReport.csv.gz
-2022-09-21 16:12:27,620|rows_out|1685
-2022-09-21 16:12:28,434|input_file|input/ICEFacilityListAuthorizedDMCPDetailed.csv.gz
-2022-09-21 16:12:28,434|rows_in|215
-2022-09-21 16:12:28,523|output_file|input/ICEFacilityListAuthorizedDMCPDetailed.csv.gz
-2022-09-21 16:12:28,524|rows_out|215
+2022-09-22 14:29:00|Log Start Time
+2022-09-22 14:29:00|Input file: input/ICEFacilityListReport.csv.gz
+2022-09-22 14:29:00|Rows in: 1685
+2022-09-22 14:29:00|Output file: input/ICEFacilityListReport.csv.gz
+2022-09-22 14:29:00|Rows in: 1685
+2022-09-22 14:29:00|Log End Time

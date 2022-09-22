@@ -7,14 +7,15 @@
 #
 #
 
-proot := $(shell git rev-parse --show-toplevel)
+.PHONY: clean all
 
 all: \
-	output/facil-list.csv.gz \
-	output/dmcp-detailed.csv.gz
-	
-PHONY: all
+	output/facil-list.csv.gz
+# 	output/dmcp-detailed.csv.gz
 
+clean: 
+	rm -r output/*
+	
 output/facil-list.csv.gz: \
 	src/clean.py \
 	input/ICEFacilityListReport.csv.gz \
@@ -25,13 +26,13 @@ output/facil-list.csv.gz: \
 		--header=8 \
 		--output=$@
 
-output/dmcp-detailed.csv.gz: \
-	src/clean.py \
-	input/ICEFacilityListAuthorizedDMCPDetailed.csv.gz \
-	hand/clean_rules.yaml
-	python $< \
-		--input=input/ICEFacilityListAuthorizedDMCPDetailed.csv.gz \
-		--cleanrules=hand/clean_rules.yaml \
-		--header=7 \
-		--output=$@
+# output/dmcp-detailed.csv.gz: \
+# 	src/clean.py \
+# 	input/ICEFacilityListAuthorizedDMCPDetailed.csv.gz \
+# 	hand/clean_rules.yaml
+# 	python $< \
+# 		--input=input/ICEFacilityListAuthorizedDMCPDetailed.csv.gz \
+# 		--cleanrules=hand/clean_rules.yaml \
+# 		--header=7 \
+# 		--output=$@
 # End.

@@ -31,6 +31,7 @@ if __name__ == "__main__":
     logging.basicConfig(filename='output/clean.log',
                     filemode='a',
                     format=f'%(asctime)s|%(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S',
                     level=logging.INFO)
 
     read_csv_opts = {'sep': '|',
@@ -41,8 +42,9 @@ if __name__ == "__main__":
 
     df = pd.read_csv(args.input, **read_csv_opts)
 
-    logging.info(f'input_file|{args.input}')
-    logging.info(f'rows_in|{len(df)}')
+    logging.info('Log Start Time')
+    logging.info(f'Input file: {args.input}')
+    logging.info(f'Rows in: {len(df)}')
 
     with open(args.cleanrules, 'r') as yamlfile:
         cleanrules = yaml.safe_load(yamlfile)
@@ -71,7 +73,8 @@ if __name__ == "__main__":
                       'index': False}
 
     df.to_csv(args.output, **write_csv_opts)
-    logging.info(f'output_file|{args.input}')
-    logging.info(f'rows_out|{len(df)}')
+    logging.info(f'Output file: {args.input}')
+    logging.info(f'Rows in: {len(df)}')
+    logging.info('Log End Time')
 
 # END.
