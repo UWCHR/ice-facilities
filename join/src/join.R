@@ -24,14 +24,20 @@ log_layout(logger)
 facilities <- read_delim(args$input,
     delim = "|") 
 
-log_info('input_file|facil-list.csv.gz')
+log_info('Input file: {args$input}')
 rows_in <- nrow(facilities)
-log_info('rows_in|{rows_in}')
+log_info('Rows in: {rows_in}')
 
+log_info('File to join: {args$to_join}')
 new_facilities <- read_delim(args$to_join,
     delim = ",")
+rows_in <- nrow(new_facilities)
+log_info('Rows in: {rows_in}')
+
 
 #Data cleaning
+pre_drop <- nrow(facilities)
+
 facilities_clean <- facilities %>%
     select(1:12,
         authorizing_authority,
@@ -49,7 +55,7 @@ facilities_clean <- facilities %>%
 facilities_clean[facilities_clean == "nan"] <- NA
 
 post_drop <- nrow(facilities_clean)
-log_info('dropped_redacted|{rows_in - post_drop}')
+log_info('Facilities with redacted DETLOC dropped: {pre_drop - post_drop}')
 
 facilities_clean$capacity <- as.numeric(as.character(facilities_clean$capacity))
 
@@ -65,7 +71,7 @@ new_facilities_clean <- new_facilities %>% select(1:14, 16:17) %>%
                              TRUE ~ FALSE))
 
 post_drop <- nrow(new_facilities_clean)
-log_info('under_50_pop_dropped|{pre_drop - post_drop}')
+log_info('Facilities with under 50 total headcount dropped: {pre_drop - post_drop}')
 
 new_facilities_clean$zip <- as.factor(new_facilities_clean$zip)
 
@@ -78,7 +84,7 @@ df <- bind_rows(facilities_clean, new_facilities_clean) %>%
 write_delim(df, args$output,
     delim='|')
 
-log_info('rows_out|{nrow(df)}')
-log_info('output_file|{args$output}')
+log_info('Rows out: {nrow(df)}')
+log_info('Output file: {args$output}')
 
 # END.
