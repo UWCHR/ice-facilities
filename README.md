@@ -1,4 +1,8 @@
-# Sources for ice-facilities characteristics
+# Analysis of ICE detention facilities characteristics
+
+This repository minimally processes and selects data from ICE detention facility characteristics spreadsheet obtained via FOIA NIJC 2017; and joins this to a table of UWCHR-researched facility characteristics for facilities not included in NIJC 2017.
+
+## Sources for ice-facilities characteristics
 
 Data in ice-facilities/hand/to_research.csv, which is a file containing information for "new" detention facilities (in use from 2017), comes from:
 
@@ -15,4 +19,4 @@ Data in ice-facilities/hand/to_research.csv, which is a file containing informat
 - For `over_72` column: 
   - [ICE Detention Statistics - Over-72-Hour Facilities](https://www.ice.gov/doclib/detention/Over72HourFacilities.xlsx)
 - Most columns and info from other sources were taken from and compared with:
-  - [ICE Detention Statistics - FY21_detentionStats07082021.xlsx](https://github.com/UWCHR/ice-facilities/files/7491684/FY21_detentionStats07082021.xlsx)
+  - [ICE Detention Statistics - FY21_detentionStats07082021.xlsx](https://github.com/UWCHR/ice-facilities/import/input/FY21_detentionStats07082021.xlsx)
