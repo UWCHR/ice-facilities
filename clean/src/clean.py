@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     df.to_csv(args.output, **write_csv_opts)
     logging.info(f'Output file: {args.input}')
-    logging.info(f'Rows in: {len(df)}')
+    logging.info(f'Rows out: {len(df)}')
     logging.info('Log End Time')
 
 # END.
