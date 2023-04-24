@@ -14,3 +14,11 @@
 2022-09-22 14:29:55|Facilities with under 50 total headcount dropped: 96
 2022-09-22 14:29:55|Rows out: 1532
 2022-09-22 14:29:55|Output file: output/facilities.csv.gz
+2023-04-24 15:24:26|Input file: input/facil-list.csv.gz
+2023-04-24 15:24:26|Rows in: 1685
+2023-04-24 15:24:26|File to join: hand/new_facilities.csv
+2023-04-24 15:24:26|Rows in: 150
+2023-04-24 15:24:26|Facilities with redacted DETLOC dropped: 207
+2023-04-24 15:24:26|Facilities with under 50 total headcount dropped: 96
+2023-04-24 15:24:26|Rows out: 1532
+2023-04-24 15:24:26|Output file: output/facilities.csv.gz
