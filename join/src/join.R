@@ -26,13 +26,13 @@ facilities <- read_delim(args$input,
 
 log_info('Input file: {args$input}')
 rows_in <- nrow(facilities)
-log_info('Rows in: {rows_in}')
+log_info('NIJC rows in: {rows_in}')
 
 log_info('File to join: {args$to_join}')
 new_facilities <- read_delim(args$to_join,
     delim = ",")
 rows_in <- nrow(new_facilities)
-log_info('Rows in: {rows_in}')
+log_info('New facil rows in: {rows_in}')
 
 
 #Data cleaning
