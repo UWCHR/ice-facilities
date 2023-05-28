@@ -1,6 +1,6 @@
 # Analysis of ICE detention facilities characteristics
 
-This repository minimally processes and selects data from ICE detention facility characteristics spreadsheet obtained via FOIA NIJC 2017; and joins this to a table of UWCHR-researched facility characteristics for facilities not included in NIJC 2017.
+This repository minimally processes and selects data from ICE detention facility characteristics spreadsheet obtained via FOIA ([NIJC 2017](https://immigrantjustice.org/ice-detention-facilities-november-2017)); and joins this to a table of UWCHR-researched facility characteristics for facilities not included in NIJC 2017.
 
 ## Sources for ice-facilities characteristics
 
