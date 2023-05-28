@@ -1,16 +1,8 @@
-2022-09-23 15:39:29|Input file: input/facil-list.csv.gz
-2022-09-23 15:39:29|Rows in: 1685
-2022-09-23 15:39:29|File to join: hand/new_facilities.csv
-2022-09-23 15:39:29|Rows in: 150
-2022-09-23 15:39:30|Facilities with redacted DETLOC dropped: 207
-2022-09-23 15:39:30|Facilities with under 50 total headcount dropped: 96
-2022-09-23 15:39:30|Rows out: 1532
-2022-09-23 15:39:30|Output file: output/facilities.csv.gz
-2023-05-28 11:10:24|Input file: input/facil-list.csv.gz
-2023-05-28 11:10:24|NIJC rows in: 1685
-2023-05-28 11:10:24|File to join: hand/new_facilities.csv
-2023-05-28 11:10:24|New facil rows in: 150
-2023-05-28 11:10:24|Facilities with redacted DETLOC dropped: 207
-2023-05-28 11:10:24|Facilities with under 50 total headcount dropped: 96
-2023-05-28 11:10:24|Rows out: 1532
-2023-05-28 11:10:24|Output file: output/facilities.csv.gz
+2023-05-28 14:30:14|Input file: input/facil-list.csv.gz
+2023-05-28 14:30:14|NIJC rows in: 1685
+2023-05-28 14:30:14|File to join: hand/new_facilities.csv
+2023-05-28 14:30:14|New facil rows in: 150
+2023-05-28 14:30:15|Facilities with redacted DETLOC dropped: 207
+2023-05-28 14:30:15|Facilities with under 50 total headcount dropped: 96
+2023-05-28 14:30:15|Rows out: 1532
+2023-05-28 14:30:15|Output file: output/facilities.csv.gz
